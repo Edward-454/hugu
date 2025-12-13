@@ -66,6 +66,15 @@ jobs:
         $GITHUB_WORKSPACE/armsr/armv8/diy/diy.sh
         ./scripts/feeds update -a
         ./scripts/feeds install -a
+    - name: Fix libnftnl version
+      run: |
+        cd openwrt
+        # 备份旧版本
+        mv package/libs/libnftnl package/libs/libnftnl.bak
+        # 下载新版本（示例）
+        git clone https://github.com/openwrt/packages.git temp-packages
+        cp -r temp-packages/libs/libnftnl package/libs/
+        rm -rf temp-packages
 
     - name: Load N1 custom config
       run: |
@@ -95,7 +104,7 @@ jobs:
       env:
         OPENWRT_ARMVIRT: openwrt/bin/targets/armsr/armv8/*rootfs.tar.gz
         KERNEL_REPO_URL: breakingbadboy/OpenWrt
-        KERNEL_VERSION_NAME: 6.6.y
+        KERNEL_VERSION_NAME: 6.6.y_6.12.y
         PACKAGE_SOC: diy
         GZIP_IMGS: .xz
         SCRIPT_DIY_PATH: armsr/armv8/N1/mk_s905d_n1.sh
