@@ -15,7 +15,7 @@ on:
     - cron: "0 0 1,16 * *"
 
 env:
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  GITHUB_TOKEN: ${{ secrets.GI_TOKEN }}
   REPO_URL: https://github.com/immortalwrt/immortalwrt
   REPO_BRANCH: openwrt-24.10
   TZ: Asia/Shanghai
@@ -105,6 +105,8 @@ jobs:
 
     - name: Upload firmware to release
       uses: softprops/action-gh-release@master
+      env:
+          GITHUB_TOKEN: ${{ secrets.GI_TOKEN }}
       with:
         tag_name: OpenWrt_${{ env.FILE_DATE }}
         files: ${{ env.PACKAGED_OUTPUTPATH }}/*.img.xz
@@ -117,6 +119,8 @@ jobs:
 
     - name: Delete old releases
       uses: dev-drprasad/delete-older-releases@master
+      env:
+          GITHUB_TOKEN: ${{ secrets.GI_TOKEN }}
       with:
         keep_latest: 2
         delete_tags : true
