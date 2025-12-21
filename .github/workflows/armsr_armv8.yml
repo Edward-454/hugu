@@ -42,12 +42,10 @@ jobs:
     - name: Initialize environment
       env:
         DEBIAN_FRONTEND: noninteractive
-        
+        NEEDRESTART_SUSPEND: 1
 
       run: |
-        sudo mkdir -p /etc/needrestart
-        echo '$nrconf{restart} = "a";' | sudo tee /etc/needrestart/conf.d/99-ci.conf
-
+        
         sudo apt-get -qq update
         sudo apt-get -qq install -y \
           ack antlr3 asciidoc autoconf automake autopoint binutils bison \
