@@ -43,40 +43,50 @@ jobs:
 
     - name: Install Go 1.25+
       run: |
-        # 1. 清理旧版本，准备目录
+       # 1. 清理旧版本
         sudo rm -rf /usr/local/go
-        
-        # 2. 动态获取并安装最新的Go 1.25.x版本
-        echo "正在从官方列表获取最新的Go 1.25.x版本..."
-        GO_VERSION=$(curl -s https://go.dev/dl/?mode=json | grep -o '"version":"go1\.25\.[0-9]*"' | head -1 | cut -d'"' -f4)
-        
-        if [ -z "$GO_VERSION" ]; then
-          echo "动态获取版本失败，使用备用版本 go1.25.5"
-          GO_VERSION="go1.25.5"
-        fi
-        echo "将安装版本: $GO_VERSION"
-        
-        # 3. 使用腾讯云镜像下载（中国大陆访问更稳定）
-        wget "https://mirrors.cloud.tencent.com/golang/${GO_VERSION}.linux-amd64.tar.gz" -O go.tar.gz
-        
-        # 4. 解压并设置权限
-        sudo tar -C /usr/local -xzf go.tar.gz
-        rm go.tar.gz
-        
-        # 5. 【核心】通过GITHUB_ENV设置环境变量给后续步骤
-        echo "GOROOT=/usr/local/go" >> $GITHUB_ENV
-        echo "GOPATH=/tmp/go" >> $GITHUB_ENV
-        echo "PATH=/usr/local/go/bin:$PATH" >> $GITHUB_ENV
-        
-        # 6. 使用绝对路径验证当前步骤安装（关键！）
-        echo "=== 在当前步骤验证 (使用绝对路径) ==="
-        /usr/local/go/bin/go version
-        if /usr/local/go/bin/go version; then
-            echo "✓ Go 已成功安装并解压。PATH已为后续步骤设置。"
-        else
-            echo "✗ Go 安装验证失败！"
-            exit 1
-        fi
+
+   
+    
+       # 2. 设置要安装的版本 (已确认存在)
+       GO_VERSION="go1.25.5"
+       echo "将安装版本: $GO_VERSION"
+    
+        # 3. 定义多个镜像源，逐个尝试下载
+       MIRRORS=(
+        "https://golang.google.cn/dl/${GO_VERSION}.linux-amd64.tar.gz"
+        "https://mirrors.aliyun.com/golang/${GO_VERSION}.linux-amd64.tar.gz"
+        "https://mirrors.hust.edu.cn/golang/${GO_VERSION}.linux-amd64.tar.gz"
+       )
+    
+       # 4. 尝试下载，直到一个成功
+       for MIRROR_URL in "${MIRRORS[@]}"; do
+         echo "正在尝试从 $MIRROR_URL 下载..."
+         if wget "$MIRROR_URL" -O go.tar.gz; then
+           echo "下载成功！"
+           break
+         else
+           echo "下载失败，尝试下一个镜像..."
+           rm -f go.tar.gz
+         fi
+       done
+    
+       # 5. 检查下载文件是否存在
+       if [ ! -f go.tar.gz ]; then
+         echo "错误：所有镜像源下载尝试均失败。"
+         exit 1
+       fi
+    
+       # 6. 解压并设置环境变量（后续步骤保持不变）
+       sudo tar -C /usr/local -xzf go.tar.gz
+       rm go.tar.gz
+    
+       echo "GOROOT=/usr/local/go" >> $GITHUB_ENV
+       echo "GOPATH=/tmp/go" >> $GITHUB_ENV
+       echo "PATH=/usr/local/go/bin:$PATH" >> $GITHUB_ENV
+      
+       echo "=== 验证安装 ==="
+       /usr/local/go/bin/go version
 
     - name: Initialize environment
       env:
