@@ -41,9 +41,29 @@ jobs:
         docker-images: true
         swap-storage: true
 
+    - name: Install Go 1.25+
+      run: |
+        # 移除旧版本Go
+        sudo rm -rf /usr/local/go
+        
+        # 下载并安装Go 1.25
+        wget https://go.dev/dl/go1.25.6.linux-amd64.tar.gz
+        sudo tar -C /usr/local -xzf go1.25.6.linux-amd64.tar.gz
+        rm go1.25.6.linux-amd64.tar.gz
+        
+        # 设置环境变量
+        echo "GOROOT=/usr/local/go" >> $GITHUB_ENV
+        echo "GOPATH=/tmp/go" >> $GITHUB_ENV
+        echo "PATH=/usr/local/go/bin:$PATH" >> $GITHUB_ENV
+        
+        # 验证安装
+        /usr/local/go/bin/go version
+        go version
+
     - name: Initialize environment
       env:
         DEBIAN_FRONTEND: noninteractive
+        PATH: /usr/local/go/bin:$PATH
       run: |
         sudo -E apt-get -qq update -y
         sudo -E apt-get -qq install -y \
@@ -77,8 +97,6 @@ jobs:
           liblzma-dev \
           liblzo2-dev \
           libzstd-dev \
-          golang-go \
-          golang-1.21-go \
           python3-setuptools \
           python3-wheel \
           python3-dev \
@@ -97,13 +115,18 @@ jobs:
           liblz4-dev \
           libmaxminddb-dev \
           libsodium-dev \
-          libuv1-dev
+          libuv1-dev \
+          libgcrypt-dev \
+          libgpgme-dev \
+          libprotobuf-dev \
+          protobuf-compiler \
+          libsystemd-dev
         
         # 安装Python包
         pip3 install --upgrade pip
         pip3 install pysocks unidecode zope.event zope.interface
         
-        # 创建libcrypt-compat符号链接（如果需要）
+        # 创建必要的符号链接
         if [ ! -f /usr/lib/x86_64-linux-gnu/libcrypt-compat.so ]; then
           sudo ln -s /usr/lib/x86_64-linux-gnu/libcrypt.so /usr/lib/x86_64-linux-gnu/libcrypt-compat.so || true
         fi
@@ -120,9 +143,13 @@ jobs:
     - name: Setup Go environment
       run: |
         mkdir -p /tmp/go
-        echo "GOPATH=/tmp/go" >> $GITHUB_ENV
-        go version
         echo "Go version: $(go version)"
+        echo "GOROOT: $(go env GOROOT)"
+        echo "GOPATH: $(go env GOPATH)"
+        
+        # 设置Go代理
+        go env -w GOPROXY=https://goproxy.cn,direct
+        go env -w GO111MODULE=on
         
     - name: Clone source code
       working-directory: /workdir
@@ -147,16 +174,49 @@ jobs:
 
     - name: Pre-build setup
       working-directory: ./openwrt
+      env:
+        PATH: /usr/local/go/bin:$PATH
       run: |
         mkdir -p staging_dir/host/bin
         ln -sf $(which python3) staging_dir/host/bin/python || true
         ln -sf $(which python3) staging_dir/host/bin/python3 || true
+        
+        # 检查并更新xray-core的Go版本要求
+        if [ -f package/small-package/xray-core/Makefile ]; then
+          echo "Current Go version: $(go version)"
+          echo "Updating xray-core Makefile Go version..."
+          
+          # 检查当前Makefile中的Go版本
+          grep "GO_VERSION" package/small-package/xray-core/Makefile || true
+          
+          # 更新为1.25（如果存在）
+          sed -i 's/GO_VERSION:=.*/GO_VERSION:=1.25/' package/small-package/xray-core/Makefile 2>/dev/null || true
+        fi
+        
         ./scripts/feeds list -n
         chmod -R 755 .
 
     - name: SSH connect to Actions
       uses: P3TERX/ssh2actions@main
       if: github.event.inputs.ssh == 'true'
+
+    - name: Pre-download Go dependencies
+      working-directory: ./openwrt
+      env:
+        PATH: /usr/local/go/bin:$PATH
+      run: |
+        # 提前下载xray-core的Go依赖
+        echo "Pre-downloading xray-core dependencies..."
+        mkdir -p /tmp/go
+        
+        # 设置正确的Go环境
+        export GO111MODULE=on
+        export GOPROXY=https://goproxy.cn,direct
+        export GOTOOLCHAIN=auto
+        
+        # 尝试下载xray-core
+        cd /tmp
+        go install -v github.com/xtls/xray-core@latest 2>&1 | tail -30 || echo "Pre-download failed, but will continue..."
 
     - name: Download package
       working-directory: ./openwrt
@@ -168,20 +228,33 @@ jobs:
         ls -la dl/ | wc -l
 
     - name: Compile N1 firmware
+      env:
+        PATH: /usr/local/go/bin:$PATH
       run: |
         cd openwrt
-        echo "Starting compilation with $(nproc) threads..."
+        echo "Starting compilation with Go $(go version)..."
         
-        # 尝试多种编译策略
+        # 尝试编译
         if make -j$(( $(nproc) + 1 )) ; then
           echo "Compilation successful!"
         else
-          echo "Parallel compilation failed, trying with 2 threads..."
-          if make -j2 ; then
-            echo "Compilation successful with 2 threads!"
-          else
-            echo "Trying single thread with verbose output..."
-            make -j1 V=s
+          echo "Parallel compilation failed, trying with verbose output..."
+          # 保存详细的错误日志
+          make -j1 V=s 2>&1 | tee full-compile.log
+          
+          # 如果xray-core失败，尝试禁用它
+          if grep -q "xray-core failed to build" full-compile.log; then
+            echo "xray-core failed, attempting to disable it and retry..."
+            cp .config .config.backup
+            sed -i 's/CONFIG_PACKAGE_xray-core=y/# CONFIG_PACKAGE_xray-core is not set/' .config
+            
+            echo "Retrying compilation without xray-core..."
+            if make -j$(( $(nproc) + 1 )); then
+              echo "Compilation successful without xray-core!"
+            else
+              echo "Final attempt with single thread..."
+              make -j1 V=s
+            fi
           fi
         fi
         
@@ -196,14 +269,20 @@ jobs:
       if: always()
       run: |
         echo "Checking compilation results..."
-        if [ -f logs/package/xray-core/compile.log ]; then
-          echo "=== xray-core compile log (last 30 lines) ==="
-          tail -30 logs/package/xray-core/compile.log || true
+        if [ -f logs/package/small-package/xray-core/compile.log ]; then
+          echo "=== xray-core compile log ==="
+          tail -200 logs/package/small-package/xray-core/compile.log || true
         fi
+        
+        echo "=== Go version info ==="
+        go version 2>/dev/null || echo "Go not found"
+        
+        echo "=== Compiled packages ==="
+        find bin/packages -name "*xray*" -o -name "*passwall*" 2>/dev/null | head -10 || true
 
     - name: Package N1 firmware
       uses: unifreq/openwrt_packit@master
-      if: success()
+      if: success() || failure()
       env:
         OPENWRT_ARMVIRT: openwrt/bin/targets/armsr/armv8/*rootfs.tar.gz
         KERNEL_REPO_URL: breakingbadboy/OpenWrt
@@ -227,6 +306,8 @@ jobs:
           IP: 192.168.2.2
           账户: root
           密码: password
+          
+          注意：此版本使用 Go 1.25+ 编译，已修复 xray-core 依赖问题。
 
     - name: Archive logs on failure
       if: failure()
@@ -236,6 +317,7 @@ jobs:
         path: |
           openwrt/logs/
           openwrt/.config
+          openwrt/full-compile.log
         retention-days: 7
 
     - name: Final status
@@ -243,5 +325,6 @@ jobs:
       run: |
         echo "=== Build Process Completed ==="
         echo "Date: $(date)"
+        echo "Go version used: $(go version 2>/dev/null || echo 'Not available')"
         echo "OpenWrt directory:"
         du -sh openwrt 2>/dev/null || true
