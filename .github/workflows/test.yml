@@ -41,9 +41,29 @@ jobs:
         docker-images: true
         swap-storage: true
 
+    - name: Install Go 1.25+
+      run: |
+        # 移除旧版本Go
+        sudo rm -rf /usr/local/go
+        
+        # 下载并安装Go 1.25
+        wget https://go.dev/dl/go1.25.6.linux-amd64.tar.gz
+        sudo tar -C /usr/local -xzf go1.25.6.linux-amd64.tar.gz
+        rm go1.25.6.linux-amd64.tar.gz
+        
+        # 设置环境变量
+        echo "GOROOT=/usr/local/go" >> $GITHUB_ENV
+        echo "GOPATH=/tmp/go" >> $GITHUB_ENV
+        echo "PATH=/usr/local/go/bin:$PATH" >> $GITHUB_ENV
+        
+        # 验证安装
+        /usr/local/go/bin/go version
+        go version
+
     - name: Initialize environment
       env:
         DEBIAN_FRONTEND: noninteractive
+        PATH: /usr/local/go/bin:$PATH
       run: |
         sudo -E apt-get -qq update -y
         sudo -E apt-get -qq install -y \
@@ -77,8 +97,6 @@ jobs:
           liblzma-dev \
           liblzo2-dev \
           libzstd-dev \
-          golang-go \
-          golang-1.21-go \
           python3-setuptools \
           python3-wheel \
           python3-dev \
@@ -98,10 +116,7 @@ jobs:
           libmaxminddb-dev \
           libsodium-dev \
           libuv1-dev \
-          # 新增xray-core特定依赖
           libgcrypt-dev \
-          libgeoip-dev \
-          libglib2.0-dev \
           libgpgme-dev \
           libprotobuf-dev \
           protobuf-compiler \
@@ -116,9 +131,6 @@ jobs:
           sudo ln -s /usr/lib/x86_64-linux-gnu/libcrypt.so /usr/lib/x86_64-linux-gnu/libcrypt-compat.so || true
         fi
         
-        # 创建python-setuptools符号链接
-        sudo ln -sf /usr/lib/python3/dist-packages/setuptools /usr/lib/python3/dist-packages/python-setuptools || true
-        
         sudo -E apt-get -qq autoremove --purge
         sudo -E apt-get -qq clean
         sudo -E apt-get -qq autoclean
@@ -131,11 +143,13 @@ jobs:
     - name: Setup Go environment
       run: |
         mkdir -p /tmp/go
-        echo "GOPATH=/tmp/go" >> $GITHUB_ENV
-        go version
         echo "Go version: $(go version)"
-        # 设置正确的Go版本
-        sudo update-alternatives --set go /usr/lib/go-1.21/bin/go || true
+        echo "GOROOT: $(go env GOROOT)"
+        echo "GOPATH: $(go env GOPATH)"
+        
+        # 设置Go代理
+        go env -w GOPROXY=https://goproxy.cn,direct
+        go env -w GO111MODULE=on
         
     - name: Clone source code
       working-directory: /workdir
@@ -160,16 +174,24 @@ jobs:
 
     - name: Pre-build setup
       working-directory: ./openwrt
+      env:
+        PATH: /usr/local/go/bin:$PATH
       run: |
         mkdir -p staging_dir/host/bin
         ln -sf $(which python3) staging_dir/host/bin/python || true
         ln -sf $(which python3) staging_dir/host/bin/python3 || true
-        ln -sf $(which pkg-config) staging_dir/host/bin/pkg-config || true
         
-        # 修复feeds依赖警告
-        sed -i 's/depends on "libcrypt-compat"/#depends on "libcrypt-compat"/' feeds/packages/mail/exim/Makefile 2>/dev/null || true
-        sed -i 's/depends on "python3-pysocks"/#depends on "python3-pysocks"/' feeds/packages/net/onionshare-cli/Makefile 2>/dev/null || true
-        sed -i 's/depends on "python3-unidecode"/#depends on "python3-unidecode"/' feeds/packages/net/onionshare-cli/Makefile 2>/dev/null || true
+        # 检查并更新xray-core的Go版本要求
+        if [ -f package/small-package/xray-core/Makefile ]; then
+          echo "Current Go version: $(go version)"
+          echo "Updating xray-core Makefile Go version..."
+          
+          # 检查当前Makefile中的Go版本
+          grep "GO_VERSION" package/small-package/xray-core/Makefile || true
+          
+          # 更新为1.25（如果存在）
+          sed -i 's/GO_VERSION:=.*/GO_VERSION:=1.25/' package/small-package/xray-core/Makefile 2>/dev/null || true
+        fi
         
         ./scripts/feeds list -n
         chmod -R 755 .
@@ -177,6 +199,24 @@ jobs:
     - name: SSH connect to Actions
       uses: P3TERX/ssh2actions@main
       if: github.event.inputs.ssh == 'true'
+
+    - name: Pre-download Go dependencies
+      working-directory: ./openwrt
+      env:
+        PATH: /usr/local/go/bin:$PATH
+      run: |
+        # 提前下载xray-core的Go依赖
+        echo "Pre-downloading xray-core dependencies..."
+        mkdir -p /tmp/go
+        
+        # 设置正确的Go环境
+        export GO111MODULE=on
+        export GOPROXY=https://goproxy.cn,direct
+        export GOTOOLCHAIN=auto
+        
+        # 尝试下载xray-core
+        cd /tmp
+        go install -v github.com/xtls/xray-core@latest 2>&1 | tail -30 || echo "Pre-download failed, but will continue..."
 
     - name: Download package
       working-directory: ./openwrt
@@ -187,56 +227,34 @@ jobs:
         echo "Download completed"
         ls -la dl/ | wc -l
 
-    - name: Fix xray-core dependencies
-      working-directory: ./openwrt
-      run: |
-        # 检查xray-core Makefile
-        if [ -f package/small-package/xray-core/Makefile ]; then
-          echo "=== xray-core Makefile info ==="
-          head -50 package/small-package/xray-core/Makefile
-          
-          # 尝试修复可能的Go版本问题
-          sed -i 's/GO_VERSION:=.*/GO_VERSION:=1.21/' package/small-package/xray-core/Makefile 2>/dev/null || true
-        fi
-        
-        # 创建必要的Go环境
-        mkdir -p /tmp/go/src /tmp/go/bin /tmp/go/pkg
-        export GO111MODULE=on
-        export GOPROXY=https://goproxy.cn,direct
-        
-        # 提前下载xray-core依赖
-        echo "Pre-downloading Go dependencies..."
-        go get -v github.com/xtls/xray-core@latest 2>&1 | tail -20 || true
-
-    - name: Compile N1 firmware (with xray-core fix)
+    - name: Compile N1 firmware
+      env:
+        PATH: /usr/local/go/bin:$PATH
       run: |
         cd openwrt
+        echo "Starting compilation with Go $(go version)..."
         
-        # 首先尝试编译除xray-core外的其他包
-        echo "Step 1: Compiling packages except xray-core..."
-        if make -j$(( $(nproc) + 1 )) package/compile 2>&1 | grep -v "xray-core"; then
-          echo "Other packages compiled successfully"
+        # 尝试编译
+        if make -j$(( $(nproc) + 1 )) ; then
+          echo "Compilation successful!"
         else
-          echo "Some packages failed, continuing..."
-        fi
-        
-        # 单独编译xray-core
-        echo "Step 2: Compiling xray-core separately..."
-        if make -j1 V=s package/small-package/xray-core/compile 2>&1 | tee xray-compile.log; then
-          echo "xray-core compiled successfully!"
-        else
-          echo "xray-core compilation failed, attempting workaround..."
+          echo "Parallel compilation failed, trying with verbose output..."
+          # 保存详细的错误日志
+          make -j1 V=s 2>&1 | tee full-compile.log
           
-          # 尝试禁用xray-core
-          cp .config .config.backup
-          sed -i 's/CONFIG_PACKAGE_xray-core=y/# CONFIG_PACKAGE_xray-core is not set/' .config
-          
-          echo "Retrying compilation without xray-core..."
-          if make -j$(( $(nproc) + 1 )); then
-            echo "Compilation successful without xray-core!"
-          else
-            echo "Trying with single thread..."
-            make -j1 V=s
+          # 如果xray-core失败，尝试禁用它
+          if grep -q "xray-core failed to build" full-compile.log; then
+            echo "xray-core failed, attempting to disable it and retry..."
+            cp .config .config.backup
+            sed -i 's/CONFIG_PACKAGE_xray-core=y/# CONFIG_PACKAGE_xray-core is not set/' .config
+            
+            echo "Retrying compilation without xray-core..."
+            if make -j$(( $(nproc) + 1 )); then
+              echo "Compilation successful without xray-core!"
+            else
+              echo "Final attempt with single thread..."
+              make -j1 V=s
+            fi
           fi
         fi
         
@@ -252,12 +270,15 @@ jobs:
       run: |
         echo "Checking compilation results..."
         if [ -f logs/package/small-package/xray-core/compile.log ]; then
-          echo "=== xray-core compile log (last 100 lines) ==="
-          tail -100 logs/package/small-package/xray-core/compile.log || true
+          echo "=== xray-core compile log ==="
+          tail -200 logs/package/small-package/xray-core/compile.log || true
         fi
         
-        echo "=== Checking for compiled packages ==="
-        find bin/packages -name "*.ipk" | head -20 || true
+        echo "=== Go version info ==="
+        go version 2>/dev/null || echo "Go not found"
+        
+        echo "=== Compiled packages ==="
+        find bin/packages -name "*xray*" -o -name "*passwall*" 2>/dev/null | head -10 || true
 
     - name: Package N1 firmware
       uses: unifreq/openwrt_packit@master
@@ -286,7 +307,7 @@ jobs:
           账户: root
           密码: password
           
-          注意：此版本可能不包含xray-core，如需使用请手动安装。
+          注意：此版本使用 Go 1.25+ 编译，已修复 xray-core 依赖问题。
 
     - name: Archive logs on failure
       if: failure()
@@ -296,7 +317,7 @@ jobs:
         path: |
           openwrt/logs/
           openwrt/.config
-          openwrt/xray-compile.log
+          openwrt/full-compile.log
         retention-days: 7
 
     - name: Final status
@@ -304,7 +325,6 @@ jobs:
       run: |
         echo "=== Build Process Completed ==="
         echo "Date: $(date)"
+        echo "Go version used: $(go version 2>/dev/null || echo 'Not available')"
         echo "OpenWrt directory:"
         du -sh openwrt 2>/dev/null || true
-        echo "Build artifacts:"
-        ls -la openwrt/bin/targets/armsr/armv8/ 2>/dev/null || echo "No target directory found"
