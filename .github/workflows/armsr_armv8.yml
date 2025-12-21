@@ -45,11 +45,11 @@ jobs:
         
 
       run: |
-        sudo tee /usr/sbin/policy-rc.d << 'EOF'
-        #!/bin/sh
-        exit 101
-        EOF
-        sudo chmod +x /usr/sbin/policy-rc.d
+        sudo apt-get -qq update
+        sudo apt-get -qq purge -y needrestart
+
+        # 防止被依赖拉回（保险）
+        sudo apt-mark hold needrestart
 
         sudo apt-get -qq update
         sudo apt-get -qq install -y \
