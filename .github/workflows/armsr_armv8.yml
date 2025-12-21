@@ -55,14 +55,22 @@ jobs:
           python3-docutils python3-pyelftools qemu-utils re2c rsync scons \
           squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim \
           wget xmlto xxd zlib1g-dev zstd \
-          libfuse-dev fuse  # 新增关键依赖
+          libfuse-dev fuse
+        # 安装 Go 1.25+ 替代系统默认版本
+        wget https://go.dev/dl/go1.25.3.linux-amd64.tar.gz
+        sudo rm -rf /usr/local/go
+        sudo tar -C /usr/local -xzf go1.25.3.linux-amd64.tar.gz
+        echo 'export PATH=/usr/local/go/bin:$PATH' >> $HOME/.bashrc
+        source $HOME/.bashrc
+        go version  # 验证版本
+        
         sudo -E apt-get -qq autoremove --purge
         sudo -E apt-get -qq clean
         sudo -E apt-get -qq autoclean
         sudo timedatectl set-timezone "$TZ"
         sudo mkdir -p /workdir
         sudo chown $USER:$GROUPS /workdir
-        ccache -M 10G # Limit ccache size
+        ccache -M 10G
         df -hT
 
     - name: Clone source code
