@@ -2,7 +2,7 @@ name: Build ImmortalWrt-24.10 for armsr_armv8
 
 on:
   workflow_dispatch:
-   inputs:
+    inputs:
       ssh:
         description: 'SSH connection to Actions'
         required: true
@@ -20,7 +20,7 @@ env:
   TZ: Asia/Shanghai
   GO111MODULE: on
   GOPROXY: https://goproxy.cn,direct
-  GOPATH: /tmp/go
+  # 注意：GOPATH 和 PATH 将在 Install Go 步骤中动态设置
 
 jobs:
   build:
@@ -43,37 +43,50 @@ jobs:
 
     - name: Install Go 1.25+
       run: |
-        # 移除旧版本Go
+        # 1. 清理旧版本，准备目录
         sudo rm -rf /usr/local/go
         
-        # 下载并安装Go 1.25
-        wget https://go.dev/dl/go1.25.5.linux-amd64.tar.gz
-        sudo tar -C /usr/local -xzf go1.25.5.linux-amd64.tar.gz
-        rm go1.25.5.linux-amd64.tar.gz
+        # 2. 动态获取并安装最新的Go 1.25.x版本
+        echo "正在从官方列表获取最新的Go 1.25.x版本..."
+        GO_VERSION=$(curl -s https://go.dev/dl/?mode=json | grep -o '"version":"go1\.25\.[0-9]*"' | head -1 | cut -d'"' -f4)
         
-        # 设置环境变量
+        if [ -z "$GO_VERSION" ]; then
+          echo "动态获取版本失败，使用备用版本 go1.25.5"
+          GO_VERSION="go1.25.5"
+        fi
+        echo "将安装版本: $GO_VERSION"
+        
+        # 3. 使用腾讯云镜像下载（中国大陆访问更稳定）
+        wget "https://mirrors.cloud.tencent.com/golang/${GO_VERSION}.linux-amd64.tar.gz" -O go.tar.gz
+        
+        # 4. 解压并设置权限
+        sudo tar -C /usr/local -xzf go.tar.gz
+        rm go.tar.gz
+        
+        # 5. 【核心】通过GITHUB_ENV设置环境变量给后续步骤
         echo "GOROOT=/usr/local/go" >> $GITHUB_ENV
         echo "GOPATH=/tmp/go" >> $GITHUB_ENV
         echo "PATH=/usr/local/go/bin:$PATH" >> $GITHUB_ENV
         
-        # 验证安装
+        # 6. 使用绝对路径验证当前步骤安装（关键！）
+        echo "=== 在当前步骤验证 (使用绝对路径) ==="
         /usr/local/go/bin/go version
-        go version
+        if /usr/local/go/bin/go version; then
+            echo "✓ Go 已成功安装并解压。PATH已为后续步骤设置。"
+        else
+            echo "✗ Go 安装验证失败！"
+            exit 1
+        fi
 
     - name: Initialize environment
       env:
         DEBIAN_FRONTEND: noninteractive
-        export NEEDRESTART_MODE: a
-        PATH: /usr/local/go/bin:$PATH
       run: |
+        echo "=== 验证Go在PATH中 ==="
+        which go
+        go version
+        
         sudo -E apt-get -qq update -y
-        
-        # 首先检查包是否存在
-        echo "Checking available packages..."
-        apt-cache search libgcrypt-dev || true
-        apt-cache search libgpgme-dev || true
-        
-        # 安装基础编译工具
         sudo -E apt-get -qq install -y \
           ack antlr3 asciidoc autoconf automake autopoint binutils bison \
           build-essential bzip2 ccache clang cmake cpio curl device-tree-compiler \
@@ -123,19 +136,12 @@ jobs:
           liblz4-dev \
           libmaxminddb-dev \
           libsodium-dev \
-          libuv1-dev
-        
-        # 安装 xray-core 相关依赖
-        # Ubuntu 24.04 中可能包名不同
-        sudo -E apt-get -qq install -y \
+          libuv1-dev \
           libgcrypt20-dev \
           libgpgme-dev \
           libprotobuf-dev \
           protobuf-compiler \
-          libsystemd-dev \
-          libc6-dev \
-          libstdc++6 \
-          libgcc-s1
+          libsystemd-dev
         
         # 安装Python包
         pip3 install --upgrade pip
@@ -158,17 +164,6 @@ jobs:
         ccache -M 10G
         df -hT
 
-    - name: Setup Go environment
-      run: |
-        mkdir -p /tmp/go
-        echo "Go version: $(go version)"
-        echo "GOROOT: $(go env GOROOT)"
-        echo "GOPATH: $(go env GOPATH)"
-        
-        # 设置Go代理
-        go env -w GOPROXY=https://goproxy.cn,direct
-        go env -w GO111MODULE=on
-        
     - name: Clone source code
       working-directory: /workdir
       run: |
@@ -192,26 +187,25 @@ jobs:
 
     - name: Pre-build setup
       working-directory: ./openwrt
-      env:
-        PATH: /usr/local/go/bin:$PATH
       run: |
+        # 这里可以直接使用go命令，无需绝对路径
+        echo "编译前Go版本:"
+        go version
+        
         mkdir -p staging_dir/host/bin
         ln -sf $(which python3) staging_dir/host/bin/python || true
         ln -sf $(which python3) staging_dir/host/bin/python3 || true
         
         # 检查并更新xray-core的Go版本要求
         if [ -f package/small-package/xray-core/Makefile ]; then
-          echo "Current Go version: $(go version)"
-          echo "Updating xray-core Makefile Go version..."
+          echo "当前Go版本: $(go version)"
+          echo "更新xray-core Makefile Go版本..."
           
           # 检查当前Makefile中的Go版本
           grep "GO_VERSION" package/small-package/xray-core/Makefile || true
           
           # 更新为1.25（如果存在）
           sed -i 's/GO_VERSION:=.*/GO_VERSION:=1.25/' package/small-package/xray-core/Makefile 2>/dev/null || true
-          
-          # 确保使用正确的Go版本
-          sed -i 's|$(STAGING_DIR_HOST)/bin/go|/usr/local/go/bin/go|g' package/small-package/xray-core/Makefile 2>/dev/null || true
         fi
         
         ./scripts/feeds list -n
@@ -223,8 +217,6 @@ jobs:
 
     - name: Pre-download Go dependencies
       working-directory: ./openwrt
-      env:
-        PATH: /usr/local/go/bin:$PATH
       run: |
         # 提前下载xray-core的Go依赖
         echo "Pre-downloading xray-core dependencies..."
@@ -258,17 +250,14 @@ jobs:
         ls -la dl/ | wc -l
 
     - name: Compile N1 firmware
-      env:
-        PATH: /usr/local/go/bin:$PATH
       run: |
-        cd openwrt
-        echo "Starting compilation with Go $(go version)..."
-        
-        # 先检查Go环境
-        echo "Checking Go environment..."
+        echo "=== 编译前环境检查 ==="
         which go
         go version
-        go env | grep -E "GOROOT|GOPATH|GOPROXY"
+        echo "GOROOT: $GOROOT"
+        
+        cd openwrt
+        echo "Starting compilation with Go $(go version)..."
         
         # 尝试编译
         if make -j$(( $(nproc) + 1 )) ; then
@@ -360,9 +349,9 @@ jobs:
           密码: password
           
           编译信息：
-          - 使用 Go 1.25.6
+          - 使用 Go 1.25.x 版本
           - Ubuntu 24.04 环境
-          - 修复依赖问题
+          - 修复Go安装和路径配置
 
     - name: Archive logs on failure
       if: failure()
