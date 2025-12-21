@@ -70,12 +70,28 @@ rm -rf package/small-package/exim
 echo "Lowering Go version requirement from 1.25 to 1.24..."
 find feeds/ package/ -type f -name "go.mod" -exec sed -i 's/go 1.25/go 1.24/g' {} +
 
-echo "Force downgrading Go version requirements..."
-find ./ -type f -name "go.mod" -exec sed -i 's/go 1.25/go 1.24/g' {} +
+#!/bin/bash
 
-# 5. 修正 Makefile 中的硬编码限制
-# 有些插件在 Makefile 里限制了最低 Go 版本，一并修改
-find ./package/ -type f -name "Makefile" -exec sed -i 's/GO_VERSION_MIN:=1.25/GO_VERSION_MIN:=1.24/g' {} +sed -i 's/ImmortalWrt/redmek40/g' package/base-files/files/bin/config_generate
+# ... 前面的代码 (patch, git clone 等) ...
+
+echo "Lowering Go version requirement from 1.25 to 1.24..."
+# 针对 feeds 目录
+if [ -d "feeds" ]; then
+    find feeds/ -type f -name "go.mod" -exec sed -i 's/go 1.25/go 1.24/g' {} \;
+fi
+
+# 针对 package 目录
+if [ -d "package" ]; then
+    find package/ -type f -name "go.mod" -exec sed -i 's/go 1.25/go 1.24/g' {} \;
+    find package/ -type f -name "Makefile" -exec sed -i 's/GO_VERSION_MIN:=1.25/GO_VERSION_MIN:=1.24/g' {} \;
+fi
+
+echo "Go version downgrade completed."
+# 修正后的 go.mod 修改命令
+find ./ -type f -name "go.mod" -exec sed -i 's/go 1.25/go 1.24/g' {} \;
+
+# 修正后的 Makefile 修改命令
+find ./package/ -type f -name "Makefile" -exec sed -i 's/GO_VERSION_MIN:=1.25/GO_VERSION_MIN:=1.24/g' {} \;
 # 设置默认密码为 password
 #sed -i 's/root:::0:99999:7:::/root:$1$V4UetPzk$CYXluq4wUazHjmCDBCqXF.::0:99999:7:::/g' openwrt/package/base-files/files/etc/shadow
 # 修改默认 IP 为 192.168.1.99
