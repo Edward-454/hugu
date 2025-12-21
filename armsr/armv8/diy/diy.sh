@@ -67,13 +67,7 @@ rm -rf package/small-package/python-zope-event
 rm -rf package/small-package/onionshare-cli
 rm -rf package/small-package/luci-app-wechatpush
 rm -rf package/small-package/exim
-echo "Lowering Go version requirement from 1.25 to 1.24..."
-find feeds/ package/ -type f -name "go.mod" -exec sed -i 's/go 1.25/go 1.24/g' {} +
-
-#!/bin/bash
-
-# ... 前面的代码 (patch, git clone 等) ...
-
+git clone https://github.com/sbwml/packages_lang_golang -b 24.x feeds/packages/lang/golang
 echo "Lowering Go version requirement from 1.25 to 1.24..."
 # 针对 feeds 目录
 if [ -d "feeds" ]; then
