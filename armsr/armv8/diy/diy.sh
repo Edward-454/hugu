@@ -62,6 +62,12 @@ rm -rf feeds/luci/applications/openlist2
 rm -rf package/small-package/luci-app-lingtigameacc
 rm -rf feeds/packages/lang/golang
 rm -rf package/small-package/nftables
+rm -rf package/small-package/haproxy
+rm -rf package/small-package/python-zope-event
+rm -rf package/small-package/onionshare-cli
+rm -rf package/small-package/luci-app-wechatpush
+rm -rf package/small-package/exim
+rm -rf package/small-package/xray-core
 git clone https://github.com/sbwml/packages_lang_golang -b 24.x feeds/packages/lang/golang
 sed -i 's/ImmortalWrt/redmek40/g' package/base-files/files/bin/config_generate
 # 设置默认密码为 password
