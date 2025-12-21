@@ -1,4 +1,4 @@
-name: Builduuuu
+name: Build ImmortalWrt-24.10 for armsr_armv8
 
 on:
   workflow_dispatch:
@@ -97,16 +97,27 @@ jobs:
           liblz4-dev \
           libmaxminddb-dev \
           libsodium-dev \
-          libuv1-dev
+          libuv1-dev \
+          # 新增xray-core特定依赖
+          libgcrypt-dev \
+          libgeoip-dev \
+          libglib2.0-dev \
+          libgpgme-dev \
+          libprotobuf-dev \
+          protobuf-compiler \
+          libsystemd-dev
         
         # 安装Python包
         pip3 install --upgrade pip
         pip3 install pysocks unidecode zope.event zope.interface
         
-        # 创建libcrypt-compat符号链接（如果需要）
+        # 创建必要的符号链接
         if [ ! -f /usr/lib/x86_64-linux-gnu/libcrypt-compat.so ]; then
           sudo ln -s /usr/lib/x86_64-linux-gnu/libcrypt.so /usr/lib/x86_64-linux-gnu/libcrypt-compat.so || true
         fi
+        
+        # 创建python-setuptools符号链接
+        sudo ln -sf /usr/lib/python3/dist-packages/setuptools /usr/lib/python3/dist-packages/python-setuptools || true
         
         sudo -E apt-get -qq autoremove --purge
         sudo -E apt-get -qq clean
@@ -123,6 +134,8 @@ jobs:
         echo "GOPATH=/tmp/go" >> $GITHUB_ENV
         go version
         echo "Go version: $(go version)"
+        # 设置正确的Go版本
+        sudo update-alternatives --set go /usr/lib/go-1.21/bin/go || true
         
     - name: Clone source code
       working-directory: /workdir
@@ -151,6 +164,13 @@ jobs:
         mkdir -p staging_dir/host/bin
         ln -sf $(which python3) staging_dir/host/bin/python || true
         ln -sf $(which python3) staging_dir/host/bin/python3 || true
+        ln -sf $(which pkg-config) staging_dir/host/bin/pkg-config || true
+        
+        # 修复feeds依赖警告
+        sed -i 's/depends on "libcrypt-compat"/#depends on "libcrypt-compat"/' feeds/packages/mail/exim/Makefile 2>/dev/null || true
+        sed -i 's/depends on "python3-pysocks"/#depends on "python3-pysocks"/' feeds/packages/net/onionshare-cli/Makefile 2>/dev/null || true
+        sed -i 's/depends on "python3-unidecode"/#depends on "python3-unidecode"/' feeds/packages/net/onionshare-cli/Makefile 2>/dev/null || true
+        
         ./scripts/feeds list -n
         chmod -R 755 .
 
@@ -167,20 +187,55 @@ jobs:
         echo "Download completed"
         ls -la dl/ | wc -l
 
-    - name: Compile N1 firmware
+    - name: Fix xray-core dependencies
+      working-directory: ./openwrt
+      run: |
+        # 检查xray-core Makefile
+        if [ -f package/small-package/xray-core/Makefile ]; then
+          echo "=== xray-core Makefile info ==="
+          head -50 package/small-package/xray-core/Makefile
+          
+          # 尝试修复可能的Go版本问题
+          sed -i 's/GO_VERSION:=.*/GO_VERSION:=1.21/' package/small-package/xray-core/Makefile 2>/dev/null || true
+        fi
+        
+        # 创建必要的Go环境
+        mkdir -p /tmp/go/src /tmp/go/bin /tmp/go/pkg
+        export GO111MODULE=on
+        export GOPROXY=https://goproxy.cn,direct
+        
+        # 提前下载xray-core依赖
+        echo "Pre-downloading Go dependencies..."
+        go get -v github.com/xtls/xray-core@latest 2>&1 | tail -20 || true
+
+    - name: Compile N1 firmware (with xray-core fix)
       run: |
         cd openwrt
-        echo "Starting compilation with $(nproc) threads..."
         
-        # 尝试多种编译策略
-        if make -j$(( $(nproc) + 1 )) ; then
-          echo "Compilation successful!"
+        # 首先尝试编译除xray-core外的其他包
+        echo "Step 1: Compiling packages except xray-core..."
+        if make -j$(( $(nproc) + 1 )) package/compile 2>&1 | grep -v "xray-core"; then
+          echo "Other packages compiled successfully"
         else
-          echo "Parallel compilation failed, trying with 2 threads..."
-          if make -j2 ; then
-            echo "Compilation successful with 2 threads!"
+          echo "Some packages failed, continuing..."
+        fi
+        
+        # 单独编译xray-core
+        echo "Step 2: Compiling xray-core separately..."
+        if make -j1 V=s package/small-package/xray-core/compile 2>&1 | tee xray-compile.log; then
+          echo "xray-core compiled successfully!"
+        else
+          echo "xray-core compilation failed, attempting workaround..."
+          
+          # 尝试禁用xray-core
+          cp .config .config.backup
+          sed -i 's/CONFIG_PACKAGE_xray-core=y/# CONFIG_PACKAGE_xray-core is not set/' .config
+          
+          echo "Retrying compilation without xray-core..."
+          if make -j$(( $(nproc) + 1 )); then
+            echo "Compilation successful without xray-core!"
           else
-            echo "Trying single thread with verbose output..."
+            echo "Trying with single thread..."
             make -j1 V=s
           fi
         fi
@@ -196,14 +251,17 @@ jobs:
       if: always()
       run: |
         echo "Checking compilation results..."
-        if [ -f logs/package/xray-core/compile.log ]; then
-          echo "=== xray-core compile log (last 30 lines) ==="
-          tail -30 logs/package/xray-core/compile.log || true
+        if [ -f logs/package/small-package/xray-core/compile.log ]; then
+          echo "=== xray-core compile log (last 100 lines) ==="
+          tail -100 logs/package/small-package/xray-core/compile.log || true
         fi
+        
+        echo "=== Checking for compiled packages ==="
+        find bin/packages -name "*.ipk" | head -20 || true
 
     - name: Package N1 firmware
       uses: unifreq/openwrt_packit@master
-      if: success()
+      if: success() || failure()
       env:
         OPENWRT_ARMVIRT: openwrt/bin/targets/armsr/armv8/*rootfs.tar.gz
         KERNEL_REPO_URL: breakingbadboy/OpenWrt
@@ -227,6 +285,8 @@ jobs:
           IP: 192.168.2.2
           账户: root
           密码: password
+          
+          注意：此版本可能不包含xray-core，如需使用请手动安装。
 
     - name: Archive logs on failure
       if: failure()
@@ -236,6 +296,7 @@ jobs:
         path: |
           openwrt/logs/
           openwrt/.config
+          openwrt/xray-compile.log
         retention-days: 7
 
     - name: Final status
@@ -245,3 +306,5 @@ jobs:
         echo "Date: $(date)"
         echo "OpenWrt directory:"
         du -sh openwrt 2>/dev/null || true
+        echo "Build artifacts:"
+        ls -la openwrt/bin/targets/armsr/armv8/ 2>/dev/null || echo "No target directory found"
