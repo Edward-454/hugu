@@ -42,7 +42,7 @@ jobs:
     - name: Initialize environment
       env:
         DEBIAN_FRONTEND: noninteractive
-        export NEEDRESTART_MODE: a
+        NEEDRESTART_MODE: a
 
       run: |
         sudo apt-get -qq update
