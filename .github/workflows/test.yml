@@ -63,6 +63,7 @@ jobs:
     - name: Initialize environment
       env:
         DEBIAN_FRONTEND: noninteractive
+        export NEEDRESTART_MODE: a
         PATH: /usr/local/go/bin:$PATH
       run: |
         sudo -E apt-get -qq update -y
