@@ -1,4 +1,4 @@
-name: Builpppppp
+name: Buil33333
 
 on:
   workflow_dispatch:
@@ -86,10 +86,11 @@ jobs:
         chmod +x armsr/armv8/diy/diy.sh
         cd openwrt
         ./scripts/feeds update -a
+       
+        ./scripts/feeds install -a
         # 在 openwrt 目录下执行 DIY 脚本
         $GITHUB_WORKSPACE/armsr/armv8/diy/diy.sh
-        ./scripts/feeds update -a
-        ./scripts/feeds install -a
+        
 
     - name: Load N1 custom config
       run: |
