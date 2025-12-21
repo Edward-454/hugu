@@ -42,10 +42,15 @@ jobs:
     - name: Initialize environment
       env:
         DEBIAN_FRONTEND: noninteractive
-        NEEDRESTART_SUSPEND: 1
+        
 
       run: |
-        
+        sudo tee /usr/sbin/policy-rc.d << 'EOF'
+        #!/bin/sh
+        exit 101
+        EOF
+        sudo chmod +x /usr/sbin/policy-rc.d
+
         sudo apt-get -qq update
         sudo apt-get -qq install -y \
           ack antlr3 asciidoc autoconf automake autopoint binutils bison \
