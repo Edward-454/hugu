@@ -67,7 +67,11 @@ rm -rf package/small-package/python-zope-event
 rm -rf package/small-package/onionshare-cli
 rm -rf package/small-package/luci-app-wechatpush
 rm -rf package/small-package/exim
+echo "Lowering Go version requirement from 1.25 to 1.24..."
+find feeds/ package/ -type f -name "go.mod" -exec sed -i 's/go 1.25/go 1.24/g' {} +
 
+# 针对某些 Makefile 里可能存在的硬编码检查也进行处理
+find feeds/ package/ -type f -name "Makefile" -exec sed -i 's/GO_VERSION_MIN:=1.25/GO_VERSION_MIN:=1.24/g' {} +
 git clone https://github.com/sbwml/packages_lang_golang -b 24.x feeds/packages/lang/golang
 sed -i 's/ImmortalWrt/redmek40/g' package/base-files/files/bin/config_generate
 # 设置默认密码为 password
