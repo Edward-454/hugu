@@ -1,4 +1,4 @@
-name: Build test
+name: Builduuuu
 
 on:
   workflow_dispatch:
@@ -59,7 +59,6 @@ jobs:
           squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim \
           wget xmlto xxd zlib1g-dev zstd \
           libfuse-dev fuse \
-          # 根据.config新增的依赖
           uuid-dev \
           libblkid-dev \
           libmount-dev \
@@ -78,28 +77,20 @@ jobs:
           liblzma-dev \
           liblzo2-dev \
           libzstd-dev \
-          # 修复xray-core编译问题
           golang-go \
           golang-1.21-go \
-          # 修复Python依赖问题
           python3-setuptools \
           python3-wheel \
-          python3-pip \
           python3-dev \
           python3-venv \
-          # 修复libcrypt-compat问题
           libcrypt-dev \
-          # xray-core可能的额外依赖
           libssl-dev \
           libgeoip-dev \
-          # 其他常见依赖
           libpcre3-dev \
           libcurl4-openssl-dev \
           libsqlite3-dev \
           libpcap-dev \
-          # 解决可能的版本冲突
           libarchive-dev \
-          # 更多可能的依赖
           libbz2-dev \
           libffi-dev \
           libgdbm-dev \
@@ -123,18 +114,13 @@ jobs:
         sudo timedatectl set-timezone "$TZ"
         sudo mkdir -p /workdir
         sudo chown $USER:$GROUPS /workdir
-        ccache -M 10G # Limit ccache size
+        ccache -M 10G
         df -hT
 
     - name: Setup Go environment
       run: |
-        # 设置Go环境变量
-        echo "GO111MODULE=on" >> $GITHUB_ENV
-        echo "GOPROXY=https://goproxy.cn,direct" >> $GITHUB_ENV
-        echo "GOPATH=/tmp/go" >> $GITHUB_ENV
         mkdir -p /tmp/go
-        
-        # 验证Go安装
+        echo "GOPATH=/tmp/go" >> $GITHUB_ENV
         go version
         echo "Go version: $(go version)"
         
@@ -162,16 +148,10 @@ jobs:
     - name: Pre-build setup
       working-directory: ./openwrt
       run: |
-        # 创建必要的符号链接
         mkdir -p staging_dir/host/bin
-        # 确保有Python3链接
         ln -sf $(which python3) staging_dir/host/bin/python || true
         ln -sf $(which python3) staging_dir/host/bin/python3 || true
-        
-        # 检查feed配置
         ./scripts/feeds list -n
-        
-        # 确保目录权限
         chmod -R 755 .
 
     - name: SSH connect to Actions
@@ -184,52 +164,46 @@ jobs:
         make defconfig
         make download -j$(( $(nproc) * 2 ))
         find dl -size -1k -exec rm -f {} \;
-        echo "Download completed, checking downloaded files..."
+        echo "Download completed"
         ls -la dl/ | wc -l
 
     - name: Compile N1 firmware
       run: |
         cd openwrt
-        echo -e "$(nproc) thread compile"
-        echo "Starting compilation..."
+        echo "Starting compilation with $(nproc) threads..."
         
         # 尝试多种编译策略
-        echo "Attempt 1: Parallel compilation with $(nproc) threads..."
         if make -j$(( $(nproc) + 1 )) ; then
           echo "Compilation successful!"
         else
-          echo "Parallel compilation failed, trying with fewer threads..."
+          echo "Parallel compilation failed, trying with 2 threads..."
           if make -j2 ; then
             echo "Compilation successful with 2 threads!"
           else
-            echo "Still failing, trying single thread with verbose output..."
-            make -j1 V=s 2>&1 | tee compile.log
-            echo "Compilation attempted. Check logs for details."
+            echo "Trying single thread with verbose output..."
+            make -j1 V=s
           fi
         fi
         
         # 检查是否生成了目标文件
         if [ -d bin/targets/armsr/armv8 ]; then
-          echo "Target directory exists:"
+          echo "Target files found:"
           ls -la bin/targets/armsr/armv8/
-        else
-          echo "Warning: Target directory not found!"
         fi
 
     - name: Check compilation results
       working-directory: ./openwrt
+      if: always()
       run: |
         echo "Checking compilation results..."
         if [ -f logs/package/xray-core/compile.log ]; then
-          echo "=== xray-core compile log (last 50 lines) ==="
-          tail -50 logs/package/xray-core/compile.log || true
+          echo "=== xray-core compile log (last 30 lines) ==="
+          tail -30 logs/package/xray-core/compile.log || true
         fi
-        
-        echo "=== Checking for important packages ==="
-        find bin/packages -name "*.ipk" | grep -E "(xray|passwall|luci)" | head -20 || true
 
     - name: Package N1 firmware
       uses: unifreq/openwrt_packit@master
+      if: success()
       env:
         OPENWRT_ARMVIRT: openwrt/bin/targets/armsr/armv8/*rootfs.tar.gz
         KERNEL_REPO_URL: breakingbadboy/OpenWrt
@@ -240,10 +214,10 @@ jobs:
         WHOAMI: nantayo
         SW_FLOWOFFLOAD: 0
         SFE_FLOW: 0
-      continue-on-error: true  # 即使打包失败也继续
 
     - name: Upload firmware to release
       uses: softprops/action-gh-release@master
+      if: success()
       with:
         tag_name: OpenWrt_${{ env.FILE_DATE }}
         files: ${{ env.PACKAGED_OUTPUTPATH }}/*.img.xz
@@ -253,7 +227,6 @@ jobs:
           IP: 192.168.2.2
           账户: root
           密码: password
-      continue-on-error: true  # 即使上传失败也继续
 
     - name: Archive logs on failure
       if: failure()
@@ -266,11 +239,9 @@ jobs:
         retention-days: 7
 
     - name: Final status
+      if: always()
       run: |
         echo "=== Build Process Completed ==="
         echo "Date: $(date)"
-        echo "Workflow status: ${{ job.status }}"
-        echo "OpenWrt directory size:"
-        du -sh openwrt || true
-        echo "Work directory size:"
-        df -h
+        echo "OpenWrt directory:"
+        du -sh openwrt 2>/dev/null || true
