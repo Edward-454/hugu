@@ -152,3 +152,10 @@ jobs:
       with:
         keep_latest: 2
         delete_tags: true
+    - name: Delete old workflow runs
+      uses: Mattraks/delete-workflow-runs@v2.0.6
+      with:
+        token: ${{ github.token }}
+        repository: ${{ github.repository }}
+        retain_days: 1
+        keep_minimum_runs: 0
