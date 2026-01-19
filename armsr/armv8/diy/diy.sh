@@ -1,6 +1,7 @@
 #!/bin/bash
 
-sed -i 's/192.168.1.1/192.168.11.249/g' package/base-files/files/bin/config_generate
+sed -i 's/192.168.1.1/192.168.110.249/g' package/base-files/files/bin/config_generate
+sed -i 's/ImmortalWrt/redmek40/g' package/base-files/files/bin/config_generate
 # Remove packages
 rm -rf feeds/luci/applications/luci-app-momo
 rm -rf feeds/luci/applications/luci-app-alist
