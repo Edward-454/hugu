@@ -85,7 +85,13 @@ jobs:
         chmod +x armsr/armv8/diy/diy.sh
         cd openwrt
         ./scripts/feeds update -a
-       
+        rm -rf feeds/telephony/net/freeswitch
+        rm -rf feeds/telephony/net/kamailio
+        
+        # 清理相关包
+        ./scripts/feeds uninstall freeswitch
+        ./scripts/feeds uninstall kamailio
+        
         ./scripts/feeds install -a
         # 在 openwrt 目录下执行 DIY 脚本
         $GITHUB_WORKSPACE/armsr/armv8/diy/diy.sh
