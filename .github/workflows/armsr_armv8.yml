@@ -94,7 +94,7 @@ jobs:
         fi
         
         # 更新 feeds
-        ./scripts/feeds update -a
+        #./scripts/feeds update -a
         
         # 删除有问题的 feeds 目录以避免编译错误
         # 根据错误信息，删除有问题的包
