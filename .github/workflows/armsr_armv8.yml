@@ -102,8 +102,7 @@ jobs:
         ./scripts/feeds uninstall kamailio || true
         
         # 更新并安装 feeds
-        ./scripts/feeds update -a
-        ./scripts/feeds install -a
+        
         
         # 在 openwrt 目录下执行 DIY 脚本
         if [ -f "$GITHUB_WORKSPACE/armsr/armv8/diy/diy.sh" ]; then
@@ -112,6 +111,8 @@ jobs:
         else
           echo "警告: 未找到 DIY 脚本: $GITHUB_WORKSPACE/armsr/armv8/diy/diy.sh"
         fi
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
 
     - name: Load N1 custom config
       run: |
