@@ -113,39 +113,11 @@ jobs:
         mkdir -p logs/feeds
         
         # 首先尝试安装所有 feeds，忽略错误
-        echo "开始安装 feeds，将忽略个别包的安装错误..."
+        echo "开始安装 feeds，将忽略个别包的安装错误.
+
         
-        # 创建一个脚本来处理有问题的 feeds 安装
-        cat > install_feeds.sh << 'EOF'
-#!/bin/bash
-set +e
-
-# 获取所有可用的 feeds 包
-PACKAGES=$(./scripts/feeds list -n)
-
-# 逐个安装包，跳过已知有问题的包
-for pkg in $PACKAGES; do
-  # 跳过已知有问题的包
-  case "$pkg" in
-    freeswitch|freeswitch-*|kamailio|kamailio-*|ddns-go|openwrt-bandix)
-      echo "跳过有问题的包: $pkg"
-      continue
-      ;;
-  esac
-  
-  echo "正在安装包: $pkg"
-  ./scripts/feeds install "$pkg" 2>/dev/null || echo "安装 $pkg 失败，继续下一个..."
-done
-
-# 尝试批量安装剩余包（可能会有一些遗漏的）
-echo "尝试批量安装剩余包..."
-./scripts/feeds install -a 2>/dev/null || true
-
-set -e
-EOF
-        
-        chmod +x install_feeds.sh
-        ./install_feeds.sh
+        chmod +x "$GITHUB_WORKSPACE/armsr/armv8/install_feeds.sh"
+        "$GITHUB_WORKSPACE/armsr/armv8/install_feeds.sh"
         
         echo "Feeds 安装完成（部分有问题的包已被跳过）"
 
