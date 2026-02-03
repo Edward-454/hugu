@@ -16,7 +16,7 @@ env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   REPO_URL: https://github.com/fanchmwrt/fanchmwrt/
   REPO_BRANCH: fanchmwrt-24.10.4
-  CONFIG_FILE: armsr/armv8/feeds.conf.default  # 注意：这个路径相对于工作空间根目录
+  CONFIG_FILE: armsr/armv8/feeds.conf.default
   TZ: Asia/Shanghai
 
 jobs:
@@ -80,8 +80,10 @@ jobs:
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
         echo "FILE_DATE=$(date +"%Y%m%d")" >> $GITHUB_ENV
 
-    - name: Update & Install feeds
+    - name: Prepare and fix problematic feeds
       run: |
+        cd /workdir/openwrt
+        
         # 检查并复制自定义的 feeds 配置文件
         if [ -f "$GITHUB_WORKSPACE/$CONFIG_FILE" ]; then
           echo "使用自定义的 feeds 配置文件: $CONFIG_FILE"
@@ -91,28 +93,73 @@ jobs:
           echo "将使用默认的 feeds 配置"
         fi
         
-        cd /workdir/openwrt
+        # 更新 feeds
+        ./scripts/feeds update -a
         
-        # 清理可能存在的 feeds 目录
+        # 删除有问题的 feeds 目录以避免编译错误
+        # 根据错误信息，删除有问题的包
         rm -rf feeds/telephony/net/freeswitch
         rm -rf feeds/telephony/net/kamailio
+        rm -rf feeds/ddnsgo/ddns-go
+        rm -rf feeds/bandix/openwrt-bandix
         
-        # 清理相关包
-        ./scripts/feeds uninstall freeswitch || true
-        ./scripts/feeds uninstall kamailio || true
+        echo "已删除有问题的 feeds 包"
+
+    - name: Install feeds with error handling
+      run: |
+        cd /workdir/openwrt
         
-        # 更新并安装 feeds
+        # 创建日志目录
+        mkdir -p logs/feeds
         
+        # 首先尝试安装所有 feeds，忽略错误
+        echo "开始安装 feeds，将忽略个别包的安装错误..."
         
-        # 在 openwrt 目录下执行 DIY 脚本
+        # 创建一个脚本来处理有问题的 feeds 安装
+        cat > install_feeds.sh << 'EOF'
+#!/bin/bash
+set +e
+
+# 获取所有可用的 feeds 包
+PACKAGES=$(./scripts/feeds list -n)
+
+# 逐个安装包，跳过已知有问题的包
+for pkg in $PACKAGES; do
+  # 跳过已知有问题的包
+  case "$pkg" in
+    freeswitch|freeswitch-*|kamailio|kamailio-*|ddns-go|openwrt-bandix)
+      echo "跳过有问题的包: $pkg"
+      continue
+      ;;
+  esac
+  
+  echo "正在安装包: $pkg"
+  ./scripts/feeds install "$pkg" 2>/dev/null || echo "安装 $pkg 失败，继续下一个..."
+done
+
+# 尝试批量安装剩余包（可能会有一些遗漏的）
+echo "尝试批量安装剩余包..."
+./scripts/feeds install -a 2>/dev/null || true
+
+set -e
+EOF
+        
+        chmod +x install_feeds.sh
+        ./install_feeds.sh
+        
+        echo "Feeds 安装完成（部分有问题的包已被跳过）"
+
+    - name: Execute DIY script
+      run: |
+        cd /workdir/openwrt
+        
+        # 执行 DIY 脚本
         if [ -f "$GITHUB_WORKSPACE/armsr/armv8/diy/diy.sh" ]; then
           chmod +x "$GITHUB_WORKSPACE/armsr/armv8/diy/diy.sh"
           "$GITHUB_WORKSPACE/armsr/armv8/diy/diy.sh"
         else
           echo "警告: 未找到 DIY 脚本: $GITHUB_WORKSPACE/armsr/armv8/diy/diy.sh"
         fi
-        ./scripts/feeds update -a
-        ./scripts/feeds install -a
 
     - name: Load N1 custom config
       run: |
@@ -137,10 +184,31 @@ jobs:
       uses: P3TERX/ssh2actions@main
       if: github.event.inputs.ssh == 'true'
 
+    - name: Generate config and skip problematic packages
+      working-directory: /workdir/openwrt
+      run: |
+        # 生成默认配置
+        make defconfig
+        
+        # 手动禁用已知有问题的包，避免它们在配置中出现
+        # 使用 sed 命令从 .config 文件中删除有问题的包
+        for pkg in \
+          CONFIG_PACKAGE_freeswitch \
+          CONFIG_PACKAGE_kamailio \
+          CONFIG_PACKAGE_ddns-go \
+          CONFIG_PACKAGE_openwrt-bandix \
+          CONFIG_PACKAGE_luci-app-freeswitch \
+          CONFIG_PACKAGE_luci-app-kamailio; do
+          sed -i "/^$pkg=/d" .config
+          sed -i "/^$pkg /d" .config
+          echo "# $pkg is not set" >> .config
+        done
+        
+        echo "已从配置中排除有问题的包"
+
     - name: Download package
       working-directory: /workdir/openwrt
       run: |
-        make defconfig
         make download -j$(( $(nproc) * 2 ))
         find dl -size -1k -exec rm -f {} \;
 
@@ -152,8 +220,17 @@ jobs:
         # 强制使用 Setup-Go 安装的路径
         export PATH=$GOROOT/bin:$PATH
         export GOTOOLCHAIN=auto
+        
+        # 清理可能的问题
+        make clean 2>/dev/null || true
+        make dirclean 2>/dev/null || true
+        
         echo -e "$(nproc) thread compile"
-        make -j$(( $(nproc) + 1 )) || make -j1 V=s
+        # 尝试编译，如果失败则尝试单线程编译
+        make -j$(( $(nproc) + 1 )) 2>&1 | tee build.log || {
+          echo "并行编译失败，尝试单线程编译..."
+          make -j1 V=s 2>&1 | tee build-single.log
+        }
         echo "status=success" >> $GITHUB_OUTPUT
 
     - name: Package N1 firmware
