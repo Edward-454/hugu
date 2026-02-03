@@ -17,6 +17,7 @@ env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   REPO_URL: https://github.com/fanchmwrt/fanchmwrt/
   REPO_BRANCH: fanchmwrt-24.10.4
+  CONFIG_FILE: armsr/armv8/feeds.conf.default
   TZ: Asia/Shanghai
 
 jobs:
@@ -82,6 +83,7 @@ jobs:
 
     - name: Update & Install feeds
       run: |
+        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
         chmod +x armsr/armv8/diy/diy.sh
         cd openwrt
         ./scripts/feeds update -a
