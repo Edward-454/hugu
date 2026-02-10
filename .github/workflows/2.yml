@@ -30,7 +30,7 @@ jobs:
     - name: Free up space
       uses: jlumbroso/free-disk-space@main
       with:
-        tool-cache: true
+        tool-cache: false
         android: true
         dotnet: true
         haskell: true
@@ -126,7 +126,7 @@ jobs:
       env:
         OPENWRT_ARMVIRT: openwrt/bin/targets/armsr/armv8/*rootfs.tar.gz
         KERNEL_REPO_URL: dsddr02/serv16
-        KERNEL_VERSION_NAME: 6.18.y_6.12.y
+        KERNEL_VERSION_NAME: 6.18.y
         PACKAGE_SOC: diy
         GZIP_IMGS: .xz
         SCRIPT_DIY_PATH: armsr/armv8/N1/mk_s905d_n1.sh
