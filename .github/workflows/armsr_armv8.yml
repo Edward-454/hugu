@@ -125,7 +125,7 @@ jobs:
       uses: unifreq/openwrt_packit@master
       env:
         OPENWRT_ARMVIRT: openwrt/bin/targets/armsr/armv8/*rootfs.tar.gz
-        KERNEL_REPO_URL: dsddr02/serv16
+        KERNEL_REPO_URL: Edward-454/beifbacke
         KERNEL_VERSION_NAME: 6.18.y
         PACKAGE_SOC: diy
         GZIP_IMGS: .xz
