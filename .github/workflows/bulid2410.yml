@@ -125,14 +125,16 @@ jobs:
       uses: unifreq/openwrt_packit@master
       env:
         OPENWRT_ARMVIRT: openwrt/bin/targets/armsr/armv8/*rootfs.tar.gz
-        KERNEL_REPO_URL: dsddr02/serv16
+        KERNEL_REPO_URL: tiantuuy/test
         KERNEL_VERSION_NAME: 6.18.y
-        PACKAGE_SOC: diy
+        PACKAGE_SOC: s905d
         GZIP_IMGS: .xz
-        SCRIPT_DIY_PATH: armsr/armv8/N1/mk_s905d_n1.sh
         WHOAMI: test
         SW_FLOWOFFLOAD: 0
         SFE_FLOW: 0
+        ENABLE_WIFI_K510: 0
+        OPENWRT_IP: 192.168.110.249
+
 
     - name: Upload firmware to release
       uses: softprops/action-gh-release@master
