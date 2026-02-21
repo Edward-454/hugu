@@ -74,15 +74,7 @@ jobs:
         rm -rf openwrt/files openwrt/.config
         mv armsr/armv8/N1/files armsr/armv8/N1/.config openwrt/
         
-    - name: 添加FUSE依赖到配置
-      working-directory: ./openwrt
-      run: |
-        # 检查并添加FUSE依赖到.config
-        echo "CONFIG_PACKAGE_libfuse=y" >> .config
-        echo "CONFIG_PACKAGE_fuse-utils=y" >> .config
-        echo "CONFIG_PACKAGE_kmod-fuse=y" >> .config
-        echo "# CONFIG_PACKAGE_fuse is not set" >> .config
-
+    
     - name: SSH connect to Actions
       uses: P3TERX/ssh2actions@main
       if: github.event.inputs.ssh == 'true'
@@ -94,21 +86,13 @@ jobs:
         make download -j$(( $(nproc) * 2 ))
         find dl -size -1k -exec rm -f {} \;
 
-    - name: 编译libfuse
-      working-directory: ./openwrt
-      run: |
-        # 确保libfuse编译
-        make package/libs/libfuse/{clean,compile} -j$(nproc) || true
-        make package/kmod-fuse/{clean,compile} -j$(nproc) || true
-
+    
     - name: Compile N1 firmware
       run: |
         chmod -R 755 openwrt
         cd openwrt
         echo -e "$(nproc) thread compile"
-        # 设置CGO环境变量
-        export CGO_CFLAGS="-I$(pwd)/staging_dir/target-*/usr/include"
-        export CGO_LDFLAGS="-L$(pwd)/staging_dir/target-*/usr/lib -lfuse"
+       
         make -j$(( $(nproc) + 1 )) || make -j1 V=s
 
     - name: Package N1 firmware
