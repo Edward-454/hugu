@@ -21,53 +21,8 @@ git clone https://github.com/kenzok8/small-package package/small-package
 git clone https://github.com/xiaorouji/openwrt-passwall-packages package/passwall-packages 
 # sed -i '$a src-git smpackage https://github.com/kenzok8/small-package' feeds.conf.default
 # sed -i '$a src-git smpackage https://github.com/kenzok8/small-package' feeds.conf.default
-rm -rf package/small-package/luci-app-openvpn-server
-rm -rf package/small-package/openvpn-easy-rsa-whisky
-rm -rf package/small-package/luci-app-wrtbwmon
-rm -rf package/small-package/wrtbwmon
-rm -rf package/small-package/luci-app-koolproxy
-rm -rf package/small-package/luci-app-godproxy
-rm -rf package/small-package/luci-app-passwall2
-#rm -rf package/small-package/luci-theme-argon*
-rm -rf package/small-package/luci-app-amlogic
-rm -rf package/small-package/cdnspeedtest
-rm -rf package/small-package/luci-app-unblockneteasemusic
-rm -rf package/small-package/upx-static
-rm -rf package/small-package/upx
-rm -rf package/small-package/firewall*
-rm -rf package/small-package/opkg
-rm -rf package/small-package/base-files
-rm -rf package/small-package/luci-app-bandwidthd
-rm -rf package/small-package/luci-app-bypass
-rm -rf package/small-package/luci-app-dogcom
-rm -rf package/small-package/luci-app-gowebdav
-rm -rf package/small-package/luci-app-nginx-pingos
-rm -rf package/small-package/luci-app-ssr-plus
-rm -rf package/small-package/luci-app-onliner
-rm -rf package/small-package/natflow
-rm -rf package/small-package/luci-app-cloudflarespeedtest
-#rm -rf feeds/smpackage/{base-files,dnsmasq,firewall*,fullconenat,libnftnl,nftables,ppp,opkg,ucl,upx,vsftpd*,miniupnpd-iptables,wireless-regdb}
-rm -rf package/feeds/packages/aliyundrive-webdav
-rm -rf feeds/packages/multimedia/aliyundrive-webdav
-rm -rf package/feeds/packages/perl-xml-parser
-rm -rf package/feeds/packages/xfsprogs
-#rm -rf package/feeds/packages/alist
-#rm -rf feeds/packages/net/alist
-rm -rf feeds/luci/applications/luci-app-openlist
-rm -rf package/small-package/luci-app-openlist
-rm -rf feeds/luci/applications/luci-app-openlist2
-rm -rf package/small-package/luci-app-openlist2
-rm -rf package/small-package/alist
-rm -rf package/small-package/openlist2
-rm -rf feeds/luci/applications/openlist2
-rm -rf package/small-package/luci-app-lingtigameacc
-rm -rf feeds/packages/lang/golang
-rm -rf package/small-package/nftables
-rm -rf package/small-package/haproxy
-rm -rf package/small-package/python-zope-event
-rm -rf package/small-package/onionshare-cli
-rm -rf package/small-package/luci-app-wechatpush
-rm -rf package/small-package/exim
+
+
 git clone https://github.com/sbwml/packages_lang_golang -b 24.x feeds/packages/lang/golang
 echo "Lowering Go version requirement from 1.25 to 1.24..."
 # 针对 feeds 目录
