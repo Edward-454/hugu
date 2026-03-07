@@ -15,12 +15,13 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@main
+      uses: actions/checkout@v6
 
     - name: Free up space
-      uses: jlumbroso/free-disk-space@main
+      uses: BRAINSia/free-disk-space@v2
       with:
         tool-cache: false
+        mandb: true
         android: true
         dotnet: true
         haskell: true
