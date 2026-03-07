@@ -2,16 +2,7 @@ name: Buildtest
 
 on:
   workflow_dispatch:
-   inputs:
-      ssh:
-        description: 'SSH connection to Actions'
-        required: true
-        default: 'false'
-        type: choice
-        options:
-          - true
-          - false
-  
+   
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   REPO_URL: https://github.com/immortalwrt/immortalwrt
@@ -29,7 +20,7 @@ jobs:
     - name: Free up space
       uses: jlumbroso/free-disk-space@main
       with:
-        tool-cache: true
+        tool-cache: false
         android: true
         dotnet: true
         haskell: true
@@ -43,16 +34,7 @@ jobs:
        sudo timedatectl set-timezone "$TZ"
        sudo mkdir -p /workdir
        sudo chown $USER:$GROUPS /workdir
-    
-        # 清理并安装fuse2
-       sudo apt-get update
-       sudo apt-get remove -y fuse3 libfuse3-dev || true
-       sudo apt-get autoremove -y || true
-       sudo apt-get install -y libfuse-dev fuse pkg-config
-    
-       # 验证
-       fuse_version=$(pkg-config --modversion fuse 2>/dev/null || echo "not found")
-       echo "FUSE version: $fuse_version"
+   
     - name: Clone source code
       working-directory: /workdir
       run: |
@@ -76,9 +58,7 @@ jobs:
         mv armsr/armv8/N1/files armsr/armv8/N1/.config openwrt/
         
     
-    - name: SSH connect to Actions
-      uses: P3TERX/ssh2actions@main
-      if: github.event.inputs.ssh == 'true'
+    
 
     - name: Download package
       working-directory: ./openwrt
