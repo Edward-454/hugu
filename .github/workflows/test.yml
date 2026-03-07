@@ -82,6 +82,7 @@ jobs:
       env:
         OPENWRT_ARMVIRT: openwrt/bin/targets/armsr/armv8/*rootfs.tar.gz
         KERNEL_REPO_URL: tiantuuy/test
+        SAVE_OPENWRT_ROOTFS: true
         KERNEL_VERSION_NAME: 6.18.y
         PACKAGE_SOC: s905d
         GZIP_IMGS: .xz
@@ -94,8 +95,8 @@ jobs:
     - name: Upload firmware to release
       uses: softprops/action-gh-release@master
       with:
-        tag_name: OpenWrt_${{ env.FILE_DATE }}
-        files: ${{ env.PACKAGED_OUTPUTPATH }}/*.img.xz
+        tag_name: openwrt_armsr-armv8_${{ env.FILE_DATE }}
+        files: ${{ env.PACKAGED_OUTPUTPATH }}/*.{img.xz,tar.gz}
         body: |
           首次使用建议全新刷写
           * 基本信息
