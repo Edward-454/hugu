@@ -12,7 +12,7 @@ rm -rf feeds/packages/net/cdnspeedtest
 # cf测速换ip两个插件
 git clone https://github.com/dsddr02/cdnspeedtest package/cdnspeedtest
 git clone https://github.com/dsddr02/peed11 package/luci-app-cloudflarespeedtest
-# git_sparse_clone main https://github.com/kenzok8/small-package luci-lib-taskd
+git clone https://github.com/kenzok8/openwrt-packages --depth=1 package/small5
 git clone --depth=1 https://github.com/ophub/luci-app-amlogic --depth=1 package/amlogic
 git clone main https://github.com/xiaorouji/openwrt-passwall --depth=1 luci-app-passwall
 git clone https://github.com/xiaorouji/openwrt-passwall2 --depth=1 package/luci-app-passwall2
