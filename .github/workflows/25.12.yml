@@ -96,7 +96,7 @@ jobs:
       uses: softprops/action-gh-release@master
       with:
         tag_name: openwrt_armsr-armv8_${{ env.FILE_DATE }}
-        files: ${{ env.PACKAGED_OUTPUTPATH }}/*.{img.xz,tar.gz}
+        files: ${{ env.PACKAGED_OUTPUTPATH }}/*.{img.xz,img.gz,tar.gz}
         body: |
           首次使用建议全新刷写
           * 基本信息
