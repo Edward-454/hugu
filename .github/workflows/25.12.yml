@@ -96,7 +96,7 @@ jobs:
 
     - name: Package N1 firmware
       uses: unifreq/openwrt_packit@master
-      with:  # 修复：使用 'with' 而不是 'env' 来传递参数
+      env:  # 修复：使用 'with' 而不是 'env' 来传递参数
         openwrt_armvirt: openwrt/bin/targets/armsr/armv8/openwrt-armsr-armv8-generic-rootfs.tar.gz
         kernel_repo_url: tiantuuy/test
         save_openwrt_rootfs: true
