@@ -76,24 +76,22 @@ jobs:
         echo "=== 查找编译产物 ==="
         find bin/targets -name "*.tar.gz" -type f
         find bin/targets -name "*.img" -type f
-        
+    
         echo "=== 检查 armsr/armv8 目录 ==="
         ls -la bin/targets/armsr/armv8/ || echo "目录不存在"
-        
-        # 如果存在其他名字的 rootfs 文件，创建符号链接
-        if [ -f bin/targets/armsr/armv8/*-rootfs.tar.gz ]; then
-          ROOTFS_FILE=$(ls bin/targets/armsr/armv8/*-rootfs.tar.gz | head -1)
-          echo "找到 rootfs: $ROOTFS_FILE"
-          # 创建打包脚本期望的文件名
-          ln -sf $(basename "$ROOTFS_FILE") bin/targets/armsr/armv8/openwrt-armsr-armv8-generic-rootfs.tar.gz
-        elif [ -f bin/targets/armsr/armv8/*.tar.gz ]; then
-          TAR_FILE=$(ls bin/targets/armsr/armv8/*.tar.gz | head -1)
-          echo "找到 tar.gz: $TAR_FILE"
-          ln -sf $(basename "$TAR_FILE") bin/targets/armsr/armv8/openwrt-armsr-armv8-generic-rootfs.tar.gz
+    
+         # 直接使用存在的 rootfs 文件创建软链接
+        if ls bin/targets/armsr/armv8/*-rootfs.tar.gz 1> /dev/null 2>&1; then
+        ROOTFS_FILE=$(ls bin/targets/armsr/armv8/*-rootfs.tar.gz | head -1)
+        echo "找到 rootfs: $ROOTFS_FILE"
+        ln -sf "$(basename "$ROOTFS_FILE")" bin/targets/armsr/armv8/openwrt-armsr-armv8-generic-rootfs.tar.gz
+        elif ls bin/targets/armsr/armv8/*.tar.gz 1> /dev/null 2>&1; then
+        TAR_FILE=$(ls bin/targets/armsr/armv8/*.tar.gz | head -1)
+        echo "找到 tar.gz: $TAR_FILE"
+        ln -sf "$(basename "$TAR_FILE")" bin/targets/armsr/armv8/openwrt-armsr-armv8-generic-rootfs.tar.gz
         else
-          echo "错误：未找到任何 rootfs 文件！"
-          ls -la bin/targets/armsr/armv8/ || true
-          exit 1
+        echo "错误：未找到任何 rootfs 文件！"
+        exit 1
         fi
 
     - name: Package N1 firmware
