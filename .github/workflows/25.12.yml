@@ -15,7 +15,7 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v6  # 修复：使用 v4 而不是 v6
+      uses: actions/checkout@v6
 
     - name: Free up space
       uses: BRAINSia/free-disk-space@v2
@@ -31,10 +31,10 @@ jobs:
 
     - name: 初始化编译环境
       run: |
-        curl -s https://build-scripts.immortalwrt.org/init_build_environment.sh | sudo bash > /dev/null
-        sudo timedatectl set-timezone "$TZ"
-        sudo mkdir -p /workdir
-        sudo chown $USER:$GROUPS /workdir
+       curl -s https://build-scripts.immortalwrt.org/init_build_environment.sh | sudo bash > /dev/null
+       sudo timedatectl set-timezone "$TZ"
+       sudo mkdir -p /workdir
+       sudo chown $USER:$GROUPS /workdir
    
     - name: Clone source code
       working-directory: /workdir
@@ -48,13 +48,18 @@ jobs:
         chmod +x armsr/armv8/diy/diy.sh
         cd openwrt
         ./scripts/feeds update -a
+        
         ./scripts/feeds install -a
         $GITHUB_WORKSPACE/armsr/armv8/diy/diy.sh
+        
 
     - name: Load N1 custom config
       run: |
         rm -rf openwrt/files openwrt/.config
         mv armsr/armv8/N1/files armsr/armv8/N1/.config openwrt/
+        
+    
+    
 
     - name: Download package
       working-directory: ./openwrt
@@ -63,13 +68,14 @@ jobs:
         make download -j$(( $(nproc) * 2 ))
         find dl -size -1k -exec rm -f {} \;
 
+    
     - name: Compile N1 firmware
       run: |
         chmod -R 755 openwrt
         cd openwrt
         echo -e "$(nproc) thread compile"
+       
         make -j$(( $(nproc) + 1 )) || make -j1 V=s
-
     - name: Check and fix build artifacts
       run: |
         cd openwrt
@@ -93,27 +99,26 @@ jobs:
         echo "错误：未找到任何 rootfs 文件！"
         exit 1
         fi
-
     - name: Package N1 firmware
       uses: unifreq/openwrt_packit@master
-      env:  # 修复：使用 'with' 而不是 'env' 来传递参数
-        openwrt_armvirt: openwrt/bin/targets/armsr/armv8/openwrt-armsr-armv8-generic-rootfs.tar.gz
-        kernel_repo_url: tiantuuy/test
-        save_openwrt_rootfs: true
-        kernel_version_name: 6.18.y
-        package_soc: s905d
-        gzip_imgs: .gz
-        whoami: test
-        sw_flowoffload: 0
-        sfe_flow: 0
-        enable_wifi_k510: 0
-        openwrt_ip: 192.168.110.249
+      env:
+        OPENWRT_ARMVIRT: openwrt/bin/targets/armsr/armv8/openwrt-armsr-armv8-generic-rootfs.tar.gz
+        KERNEL_REPO_URL: tiantuuy/test
+        SAVE_OPENWRT_ROOTFS: true
+        KERNEL_VERSION_NAME: 6.18.y
+        PACKAGE_SOC: s905d
+        GZIP_IMGS: .gz
+        WHOAMI: test
+        SW_FLOWOFFLOAD: 0
+        SFE_FLOW: 0
+        ENABLE_WIFI_K510: 0
+        OPENWRT_IP: 192.168.110.249
 
     - name: Upload firmware to release
-      uses: softprops/action-gh-release@v2  # 修复：使用 v2 而不是 master
+      uses: softprops/action-gh-release@master
       with:
         tag_name: openwrt_armsr-armv8_${{ env.FILE_DATE }}
-        files: ${{ env.PACKAGED_OUTPUTPATH }}/*.{img.xz,img.gz,tar.gz}
+        files: ${{ env.PACKAGED_OUTPUTPATH }}/*.{img.xz,tar.gz}
         body: |
           首次使用建议全新刷写
           * 基本信息
@@ -123,13 +128,10 @@ jobs:
           密码: password
 
     - name: Delete old releases
-      uses: dev-drprasad/delete-older-releases@v0.3.4  # 修复：指定具体版本
+      uses: dev-drprasad/delete-older-releases@master
       with:
         keep_latest: 2
-        delete_tags: true  # 修复：移除空格
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+        delete_tags : true
     - name: Delete old workflow runs
       uses: Mattraks/delete-workflow-runs@v2.1.0
       with:
