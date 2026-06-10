@@ -23,5 +23,3 @@ git clone https://github.com/kenzok8/jell --depth=1 package/small
 git clone https://github.com/xiaorouji/openwrt-passwall-packages --depth=1 package/passwall-packages 
 # sed -i '$a src-git smpackage https://github.com/kenzok8/small-package' feeds.conf.default
 # sed -i '$a src-git smpackage https://github.com/kenzok8/small-package' feeds.conf.default
-rm -rf feeds/packages/lang/golang
-git clone https://github.com/sbwml/packages_lang_golang -b 24.x feeds/packages/lang/golang
