@@ -18,8 +18,10 @@ git clone https://github.com/xiaorouji/openwrt-passwall --depth=1 luci-app-passw
 git clone https://github.com/xiaorouji/openwrt-passwall2 --depth=1 package/luci-app-passwall2
 git clone https://github.com/sbwml/luci-app-openlist2 --depth=1 package/luci-app-openlist2
 # git clone https://github.com/morytyann/OpenWrt-mihomo luci-app-mihomo mihomo
-git clone https://github.com/kenzok8/jell --depth=1 package/small
+# git clone https://github.com/kenzok8/jell --depth=1 package/small
 # git clone https://github.com/kenzok8/openwrt-packages --depth=1 package/small5
 git clone https://github.com/xiaorouji/openwrt-passwall-packages --depth=1 package/passwall-packages 
+git clone https://github.com/kenzok8/small-package --depth=1 package/small-package
 # sed -i '$a src-git smpackage https://github.com/kenzok8/small-package' feeds.conf.default
 # sed -i '$a src-git smpackage https://github.com/kenzok8/small-package' feeds.conf.default
+rm -rf feeds/smpackage/{base-files,dnsmasq,firewall*,fullconenat,libnftnl,nftables,ppp,opkg,ucl,upx,vsftpd*,miniupnpd-iptables,wireless-regdb}
