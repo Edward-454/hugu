@@ -1,6 +1,7 @@
 #!/bin/bash
 patch -p1 -f < $(dirname "$0")/luci.patch
-
+# 确保base-files版本正确设置
+sed -i 's/base-files=/base-files=1~3dacd2f/g' $(find . -name "*.mk" -o -name "Makefile")
 # sed -i 's/192.168.1.1/192.168.110.249/g' package/base-files/files/bin/config_generate
 sed -i 's/ImmortalWrt/redmek40/g' package/base-files/files/bin/config_generate
 # Remove packages
