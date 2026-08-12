@@ -1,7 +1,7 @@
 #!/bin/bash
 patch -p1 -f < $(dirname "$0")/luci.patch
 # 确保base-files版本正确设置
-sed -i 's/base-files=/base-files=1~3dacd2f/g' $(find . -name "*.mk" -o -name "Makefile")
+#sed -i 's/base-files=/base-files=1~3dacd2f/g' $(find . -name "*.mk" -o -name "Makefile")
 # sed -i 's/192.168.1.1/192.168.110.249/g' package/base-files/files/bin/config_generate
 sed -i 's/ImmortalWrt/redmek40/g' package/base-files/files/bin/config_generate
 # Remove packages
@@ -26,3 +26,4 @@ git clone https://github.com/kenzok8/small-package --depth=1 package/small-packa
 # sed -i '$a src-git smpackage https://github.com/kenzok8/small-package' feeds.conf.default
 # sed -i '$a src-git smpackage https://github.com/kenzok8/small-package' feeds.conf.default
 rm -rf feeds/smpackage/{base-files,dnsmasq,firewall*,fullconenat,libnftnl,nftables,ppp,opkg,ucl,upx,vsftpd*,miniupnpd-iptables,wireless-regdb}
+rm -rf package/small-package/base-files
