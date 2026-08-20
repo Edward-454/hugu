@@ -22,7 +22,7 @@ git clone https://github.com/sbwml/luci-app-openlist2 --depth=1 package/luci-app
 # git clone https://github.com/kenzok8/jell --depth=1 package/small
 # git clone https://github.com/kenzok8/openwrt-packages --depth=1 package/small5
 git clone https://github.com/Openwrt-Passwall/openwrt-passwall-packages --depth=1 package/passwall-packages 
-git clone https://github.com/kenzok8/small-package --depth=1 package/small-package
+# git clone https://github.com/kenzok8/small-package --depth=1 package/small-package
 # sed -i '$a src-git smpackage https://github.com/kenzok8/small-package' feeds.conf.default
 # sed -i '$a src-git smpackage https://github.com/kenzok8/small-package' feeds.conf.default
 rm -rf feeds/smpackage/{base-files,dnsmasq,firewall*,fullconenat,libnftnl,nftables,ppp,opkg,ucl,upx,vsftpd*,miniupnpd-iptables,wireless-regdb}
