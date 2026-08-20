@@ -79,8 +79,7 @@ jobs:
        chmod -R 755 openwrt
        cd openwrt
        # 清理构建产物以防止版本冲突
-       make clean
-       make dirclean
+       
     
        echo -e "$(nproc) thread compile"
        make -j$(( $(nproc) + 1 )) || make -j1 V=s
@@ -127,7 +126,7 @@ jobs:
     - name: Upload firmware to release
       uses: softprops/action-gh-release@master
       with:
-        tag_name: openwrt_armsr-armv8_${{ env.FILE_DATE }}
+        tag_name: openwrt_N1_${{ env.FILE_DATE }}
         files: ${{ env.PACKAGED_OUTPUTPATH }}/*.{img.xz,img.gz,tar.gz}
         body: |
           首次使用建议全新刷写
