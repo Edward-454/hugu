@@ -33,14 +33,10 @@ jobs:
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
-        sudo -E apt-get -qq update > /dev/null
-        sudo -E apt-get -qq install -y $(curl -fsSL https://raw.githubusercontent.com/nantayo/My-Pkg/master/openwrt) > /dev/null
-        sudo -E apt-get -qq autoremove --purge > /dev/null
-        sudo -E apt-get -qq clean > /dev/null
+        curl -s https://build-scripts.immortalwrt.org/init_build_environment.sh | sudo bash > /dev/null
         sudo timedatectl set-timezone "$TZ"
         sudo mkdir -p /workdir
         sudo chown $USER:$GROUPS /workdir
-
     - name: Clone source code
       working-directory: /workdir
       run: |
