@@ -61,62 +61,54 @@ jobs:
         rm -rf openwrt/files openwrt/.config
         mv armsr/armv8/N1/files armsr/armv8/N1/.config openwrt/
 
-    - name: Disable Rust packages to avoid compilation issues
+    - name: Disable all Rust-related packages
       run: |
         cd openwrt
         
-        # 方法1：在 .config 中禁用所有 Rust 相关包
-        echo "# 禁用 Rust 相关包" >> .config
-        echo "CONFIG_PACKAGE_rust=n" >> .config
-        echo "CONFIG_PACKAGE_rust-bindgen=n" >> .config
-        echo "CONFIG_PACKAGE_rust-src=n" >> .config
-        echo "CONFIG_PACKAGE_librust=n" >> .config
-        echo "CONFIG_PACKAGE_cargo=n" >> .config
-        echo "CONFIG_PACKAGE_rustc=n" >> .config
+        # 1. 在 .config 中禁用所有已知 Rust 包
+        cat >> .config << 'EOF'
+        # Disable Rust and all Rust-dependent packages
+        CONFIG_PACKAGE_rust=n
+        CONFIG_PACKAGE_rust-bindgen=n
+        CONFIG_PACKAGE_rust-src=n
+        CONFIG_PACKAGE_librust=n
+        CONFIG_PACKAGE_cargo=n
+        CONFIG_PACKAGE_rustc=n
+        CONFIG_PACKAGE_shadowsocks-rust=n
+        CONFIG_PACKAGE_ripgrep=n
+        CONFIG_PACKAGE_fd=n
+        CONFIG_PACKAGE_exa=n
+        CONFIG_PACKAGE_bat=n
+        CONFIG_PACKAGE_alacritty=n
+        CONFIG_PACKAGE_tokei=n
+        CONFIG_PACKAGE_xsv=n
+        EOF
         
-        # 方法2：从 feeds 中移除 Rust 包
-        if [ -f "feeds/packages/lang/rust/Makefile" ]; then
-          echo "找到 Rust 包，正在禁用..."
-          # 重命名 Makefile 以禁用编译
-          mv feeds/packages/lang/rust/Makefile feeds/packages/lang/rust/Makefile.disabled
-          echo "Rust 包已禁用"
+        # 2. 从 feeds 中移除 Rust 和 shadowsocks-rust 目录（彻底阻止编译）
+        if [ -d "feeds/packages/lang/rust" ]; then
+          mv feeds/packages/lang/rust feeds/packages/lang/rust.disabled
+          echo "Rust feed disabled"
+        fi
+        if [ -d "feeds/packages/net/shadowsocks-rust" ]; then
+          mv feeds/packages/net/shadowsocks-rust feeds/packages/net/shadowsocks-rust.disabled
+          echo "shadowsocks-rust feed disabled"
         fi
         
-        # 方法3：如果其他包依赖 Rust，也一并禁用
-        echo "CONFIG_PACKAGE_firefox=n" >> .config
-        echo "CONFIG_PACKAGE_servo=n" >> .config
-        echo "CONFIG_PACKAGE_ripgrep=n" >> .config
-        echo "CONFIG_PACKAGE_fd=n" >> .config
+        # 3. 清理其他 Makefile 中对这些包的依赖（防止被拉入）
+        find feeds -name "Makefile" -exec sed -i '/DEPENDS.*shadowsocks-rust/d' {} \;
+        find feeds -name "Makefile" -exec sed -i '/PKG_BUILD_DEPENDS.*rust/d' {} \;
+        find feeds -name "Makefile" -exec sed -i '/DEPENDS.*rust/d' {} \;
         
-        echo "所有 Rust 相关包已禁用"
+        echo "All Rust-related packages have been disabled."
 
-    - name: Remove Rust from package dependencies
+    - name: Configure environment (disable Rust LLVM download fallback)
       run: |
-        cd openwrt
-        
-        # 查找并移除所有对 Rust 的依赖
-        find feeds -name "Makefile" -type f -exec sed -i '/DEPENDS.*rust/d' {} \;
-        find feeds -name "Makefile" -type f -exec sed -i '/PKG_BUILD_DEPENDS.*rust/d' {} \;
-        
-        # 移除 Rust 的 dl 缓存
-        rm -rf dl/rust* dl/cargo* 2>/dev/null || true
-        
-        echo "已清理 Rust 依赖"
-
-    - name: Configure Rust environment (fallback)
-      run: |
-        # 设置环境变量以防万一
         echo "LLVM_SKIP_DOWNLOAD=1" >> $GITHUB_ENV
         echo "RUSTUP_INIT_SKIP_PATH_CHECK=yes" >> $GITHUB_ENV
-        
-        # 创建 Cargo 配置
         mkdir -p ~/.cargo
         cat > ~/.cargo/config.toml << 'EOF'
         [llvm]
         download-ci-llvm = false
-        
-        [target.x86_64-unknown-linux-gnu]
-        linker = "gcc"
         EOF
 
     - name: Download package
@@ -133,17 +125,8 @@ jobs:
         RUSTUP_INIT_SKIP_PATH_CHECK: yes
         RUST_BACKTRACE: 1
       run: |
-        # 确保权限正确
         chmod -R 755 .
-        
-        # 检查是否还有 Rust 包会被编译
-        echo "=== 检查将要编译的包 ==="
-        grep -E "CONFIG_PACKAGE.*=(y|m)" .config | grep -i rust || echo "没有 Rust 包被启用"
-        
         echo -e "$(nproc) thread compile"
-        echo "LLVM_SKIP_DOWNLOAD=$LLVM_SKIP_DOWNLOAD"
-        
-        # 尝试编译，如果失败则使用单核调试
         make -j$(( $(nproc) + 1 )) V=s || make -j1 V=s
 
     - name: Check and fix build artifacts
@@ -152,11 +135,8 @@ jobs:
         echo "=== 查找编译产物 ==="
         find bin/targets -name "*.tar.gz" -type f
         find bin/targets -name "*.img" -type f
-    
         echo "=== 检查 armsr/armv8 目录 ==="
         ls -la bin/targets/armsr/armv8/ || echo "目录不存在"
-    
-        # 直接使用存在的 rootfs 文件创建软链接
         if ls bin/targets/armsr/armv8/*-rootfs.tar.gz 1> /dev/null 2>&1; then
           ROOTFS_FILE=$(ls bin/targets/armsr/armv8/*-rootfs.tar.gz | head -1)
           echo "找到 rootfs: $ROOTFS_FILE"
