@@ -61,50 +61,53 @@ jobs:
         rm -rf openwrt/files openwrt/.config
         mv armsr/armv8/N1/files armsr/armv8/N1/.config openwrt/
 
-    - name: Patch Rust to disable CI LLVM download
+    - name: Disable Rust packages to avoid compilation issues
       run: |
         cd openwrt
         
-        # 找到 Rust 包的位置
-        RUST_DIR="feeds/packages/lang/rust"
-        if [ -d "$RUST_DIR" ]; then
-          echo "找到 Rust 包目录: $RUST_DIR"
-          
-          # 方法1: 修改 Makefile，添加环境变量
-          sed -i '/^HOST_CONFIGURE_ARGS/s/--disable-download-ci-llvm/--disable-download-ci-llvm --set llvm.download-ci-llvm=false/' "$RUST_DIR/Makefile" || true
-          
-          # 方法2: 在编译前设置环境变量到 Makefile
-          sed -i '/^HOST_CONFIGURE_VARS/s/$/ LLVM_SKIP_DOWNLOAD=1/' "$RUST_DIR/Makefile" || true
-          
-          # 方法3: 修改编译脚本
-          find "$RUST_DIR" -name "*.mk" -exec sed -i 's/download-ci-llvm=true/download-ci-llvm=false/g' {} \; || true
-          
-          echo "Rust Makefile 已修改:"
-          grep -i llvm "$RUST_DIR/Makefile" || echo "未找到 LLVM 相关配置"
-        else
-          echo "警告: 未找到 Rust 包目录"
+        # 方法1：在 .config 中禁用所有 Rust 相关包
+        echo "# 禁用 Rust 相关包" >> .config
+        echo "CONFIG_PACKAGE_rust=n" >> .config
+        echo "CONFIG_PACKAGE_rust-bindgen=n" >> .config
+        echo "CONFIG_PACKAGE_rust-src=n" >> .config
+        echo "CONFIG_PACKAGE_librust=n" >> .config
+        echo "CONFIG_PACKAGE_cargo=n" >> .config
+        echo "CONFIG_PACKAGE_rustc=n" >> .config
+        
+        # 方法2：从 feeds 中移除 Rust 包
+        if [ -f "feeds/packages/lang/rust/Makefile" ]; then
+          echo "找到 Rust 包，正在禁用..."
+          # 重命名 Makefile 以禁用编译
+          mv feeds/packages/lang/rust/Makefile feeds/packages/lang/rust/Makefile.disabled
+          echo "Rust 包已禁用"
         fi
         
-        # 创建 Rust 源码编译配置文件
-        mkdir -p feeds/packages/lang/rust/files
-        cat > feeds/packages/lang/rust/files/config.toml << 'EOF'
-        [llvm]
-        download-ci-llvm = false
-        skip-rebuild = true
-        EOF
+        # 方法3：如果其他包依赖 Rust，也一并禁用
+        echo "CONFIG_PACKAGE_firefox=n" >> .config
+        echo "CONFIG_PACKAGE_servo=n" >> .config
+        echo "CONFIG_PACKAGE_ripgrep=n" >> .config
+        echo "CONFIG_PACKAGE_fd=n" >> .config
         
-        echo "Rust 配置已创建"
-        
-        # 禁用 rust 包编译，如果可能的话使用预编译版本
-        echo "CONFIG_PACKAGE_rust=n" >> .config || true
+        echo "所有 Rust 相关包已禁用"
 
-    - name: Configure Rust environment variables
+    - name: Remove Rust from package dependencies
       run: |
-        # 设置全局环境变量
+        cd openwrt
+        
+        # 查找并移除所有对 Rust 的依赖
+        find feeds -name "Makefile" -type f -exec sed -i '/DEPENDS.*rust/d' {} \;
+        find feeds -name "Makefile" -type f -exec sed -i '/PKG_BUILD_DEPENDS.*rust/d' {} \;
+        
+        # 移除 Rust 的 dl 缓存
+        rm -rf dl/rust* dl/cargo* 2>/dev/null || true
+        
+        echo "已清理 Rust 依赖"
+
+    - name: Configure Rust environment (fallback)
+      run: |
+        # 设置环境变量以防万一
         echo "LLVM_SKIP_DOWNLOAD=1" >> $GITHUB_ENV
         echo "RUSTUP_INIT_SKIP_PATH_CHECK=yes" >> $GITHUB_ENV
-        echo "CARGO_NET_RETRY=3" >> $GITHUB_ENV
-        echo "RUST_BACKTRACE=1" >> $GITHUB_ENV
         
         # 创建 Cargo 配置
         mkdir -p ~/.cargo
@@ -112,18 +115,9 @@ jobs:
         [llvm]
         download-ci-llvm = false
         
-        [net]
-        retry = 3
-        
-        [http]
-        timeout = 600
+        [target.x86_64-unknown-linux-gnu]
+        linker = "gcc"
         EOF
-        
-        # 复制到 root 用户目录
-        sudo mkdir -p /root/.cargo
-        sudo cp ~/.cargo/config.toml /root/.cargo/ || true
-        
-        echo "Rust 环境变量已配置"
 
     - name: Download package
       working-directory: ./openwrt
@@ -137,23 +131,14 @@ jobs:
       env:
         LLVM_SKIP_DOWNLOAD: 1
         RUSTUP_INIT_SKIP_PATH_CHECK: yes
-        CARGO_NET_RETRY: 3
         RUST_BACKTRACE: 1
-        RUSTFLAGS: "-C target-feature=+crt-static"
-        CARGO_HOME: /root/.cargo
       run: |
         # 确保权限正确
         chmod -R 755 .
         
-        # 显示 Rust 配置状态
-        echo "=== Rust 编译环境变量 ==="
-        env | grep -E "(LLVM|RUST|CARGO)" || echo "未找到相关环境变量"
-        
-        # 检查 Rust 包配置
-        echo "=== Rust 包 Makefile 配置 ==="
-        if [ -f "feeds/packages/lang/rust/Makefile" ]; then
-          grep -E "(LLVM|rustc|download)" feeds/packages/lang/rust/Makefile | head -20 || echo "未找到"
-        fi
+        # 检查是否还有 Rust 包会被编译
+        echo "=== 检查将要编译的包 ==="
+        grep -E "CONFIG_PACKAGE.*=(y|m)" .config | grep -i rust || echo "没有 Rust 包被启用"
         
         echo -e "$(nproc) thread compile"
         echo "LLVM_SKIP_DOWNLOAD=$LLVM_SKIP_DOWNLOAD"
