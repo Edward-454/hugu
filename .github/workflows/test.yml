@@ -53,27 +53,77 @@ jobs:
         chmod +x armsr/armv8/diy/diy.sh
         cd openwrt
         ./scripts/feeds update -a
-        
         ./scripts/feeds install -a
         $GITHUB_WORKSPACE/armsr/armv8/diy/diy.sh
-        
 
-    - name: Configure Rust to skip CI LLVM download
-      run: |
-        cd openwrt
-        # 创建 Cargo 配置，禁用 CI LLVM 下载
-        mkdir -p ~/.cargo
-        cat >> ~/.cargo/config.toml << 'EOF'
-        [llvm]
-        download-ci-llvm = false
-        EOF
-        
-        
     - name: Load N1 custom config
       run: |
         rm -rf openwrt/files openwrt/.config
         mv armsr/armv8/N1/files armsr/armv8/N1/.config openwrt/
+
+    - name: Patch Rust to disable CI LLVM download
+      run: |
+        cd openwrt
         
+        # 找到 Rust 包的位置
+        RUST_DIR="feeds/packages/lang/rust"
+        if [ -d "$RUST_DIR" ]; then
+          echo "找到 Rust 包目录: $RUST_DIR"
+          
+          # 方法1: 修改 Makefile，添加环境变量
+          sed -i '/^HOST_CONFIGURE_ARGS/s/--disable-download-ci-llvm/--disable-download-ci-llvm --set llvm.download-ci-llvm=false/' "$RUST_DIR/Makefile" || true
+          
+          # 方法2: 在编译前设置环境变量到 Makefile
+          sed -i '/^HOST_CONFIGURE_VARS/s/$/ LLVM_SKIP_DOWNLOAD=1/' "$RUST_DIR/Makefile" || true
+          
+          # 方法3: 修改编译脚本
+          find "$RUST_DIR" -name "*.mk" -exec sed -i 's/download-ci-llvm=true/download-ci-llvm=false/g' {} \; || true
+          
+          echo "Rust Makefile 已修改:"
+          grep -i llvm "$RUST_DIR/Makefile" || echo "未找到 LLVM 相关配置"
+        else
+          echo "警告: 未找到 Rust 包目录"
+        fi
+        
+        # 创建 Rust 源码编译配置文件
+        mkdir -p feeds/packages/lang/rust/files
+        cat > feeds/packages/lang/rust/files/config.toml << 'EOF'
+        [llvm]
+        download-ci-llvm = false
+        skip-rebuild = true
+        EOF
+        
+        echo "Rust 配置已创建"
+        
+        # 禁用 rust 包编译，如果可能的话使用预编译版本
+        echo "CONFIG_PACKAGE_rust=n" >> .config || true
+
+    - name: Configure Rust environment variables
+      run: |
+        # 设置全局环境变量
+        echo "LLVM_SKIP_DOWNLOAD=1" >> $GITHUB_ENV
+        echo "RUSTUP_INIT_SKIP_PATH_CHECK=yes" >> $GITHUB_ENV
+        echo "CARGO_NET_RETRY=3" >> $GITHUB_ENV
+        echo "RUST_BACKTRACE=1" >> $GITHUB_ENV
+        
+        # 创建 Cargo 配置
+        mkdir -p ~/.cargo
+        cat > ~/.cargo/config.toml << 'EOF'
+        [llvm]
+        download-ci-llvm = false
+        
+        [net]
+        retry = 3
+        
+        [http]
+        timeout = 600
+        EOF
+        
+        # 复制到 root 用户目录
+        sudo mkdir -p /root/.cargo
+        sudo cp ~/.cargo/config.toml /root/.cargo/ || true
+        
+        echo "Rust 环境变量已配置"
 
     - name: Download package
       working-directory: ./openwrt
@@ -82,37 +132,35 @@ jobs:
         make download -j$(( $(nproc) * 2 ))
         find dl -size -1k -exec rm -f {} \;
 
-      
     - name: Compile N1 firmware
+      working-directory: ./openwrt
       env:
-        # 禁用 Rust CI LLVM 下载的环境变量
+        LLVM_SKIP_DOWNLOAD: 1
         RUSTUP_INIT_SKIP_PATH_CHECK: yes
         CARGO_NET_RETRY: 3
+        RUST_BACKTRACE: 1
+        RUSTFLAGS: "-C target-feature=+crt-static"
+        CARGO_HOME: /root/.cargo
       run: |
-        chmod -R 755 openwrt
-        cd openwrt
+        # 确保权限正确
+        chmod -R 755 .
         
-        # 设置环境变量跳过 CI LLVM 下载
-        export RUST_BACKTRACE=1
-        export LLVM_SKIP_DOWNLOAD=1
-        export DOWNLOAD_CI_LLVM=0
-        export RUST_LLVM_LINK_SHARED=1
+        # 显示 Rust 配置状态
+        echo "=== Rust 编译环境变量 ==="
+        env | grep -E "(LLVM|RUST|CARGO)" || echo "未找到相关环境变量"
         
-        # 预先设置 Cargo 环境
-        mkdir -p ~/.cargo
-        cat >> ~/.cargo/config.toml << 'EOF'
-        [llvm]
-        download-ci-llvm = false
-        
-        [build]
-        jobs = 4
-        EOF
+        # 检查 Rust 包配置
+        echo "=== Rust 包 Makefile 配置 ==="
+        if [ -f "feeds/packages/lang/rust/Makefile" ]; then
+          grep -E "(LLVM|rustc|download)" feeds/packages/lang/rust/Makefile | head -20 || echo "未找到"
+        fi
         
         echo -e "$(nproc) thread compile"
-        make -j$(( $(nproc) + 1 )) || make -j1 V=s
+        echo "LLVM_SKIP_DOWNLOAD=$LLVM_SKIP_DOWNLOAD"
         
-        make -j$(( $(nproc) + 1 )) || make -j1 V=s
-        
+        # 尝试编译，如果失败则使用单核调试
+        make -j$(( $(nproc) + 1 )) V=s || make -j1 V=s
+
     - name: Check and fix build artifacts
       run: |
         cd openwrt
@@ -169,7 +217,7 @@ jobs:
       uses: dev-drprasad/delete-older-releases@master
       with:
         keep_latest: 2
-        delete_tags : true
+        delete_tags: true
         
     - name: Delete old workflow runs
       uses: Mattraks/delete-workflow-runs@v2.1.0
