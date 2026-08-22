@@ -68,39 +68,7 @@ jobs:
         download-ci-llvm = false
         EOF
         
-        # 检查并修改 Rust 包的 Makefile
-        if [ -f "feeds/packages/lang/rust/Makefile" ]; then
-          echo "修改 Rust Makefile..."
-          sed -i 's/download-ci-llvm = true/download-ci-llvm = false/g' feeds/packages/lang/rust/Makefile || true
-          # 添加导出配置
-          if ! grep -q "RUSTFLAGS.*download-ci-llvm" feeds/packages/lang/rust/Makefile; then
-            sed -i '/CONFIGURE_ARGS/a\\texport RUSTFLAGS=-C llvm-args=-lto-embed-bitcode=no' feeds/packages/lang/rust/Makefile || true
-          fi
-        fi
         
-        # 创建 Python 脚本临时禁用 CI 工件下载
-        cat > /tmp/disable_ci_llvm.py << 'PYSCRIPT'
-        import os
-        import sys
-        
-        rust_dir = "feeds/packages/lang/rust"
-        if os.path.exists(rust_dir):
-            for root, dirs, files in os.walk(rust_dir):
-                for file in files:
-                    if file.endswith('.mk') or file == 'Makefile':
-                        filepath = os.path.join(root, file)
-                        with open(filepath, 'r') as f:
-                            content = f.read()
-                        # 替换所有 CI LLVM 相关配置
-                        content = content.replace('download-ci-llvm=true', 'download-ci-llvm=false')
-                        content = content.replace('download-ci-llvm = true', 'download-ci-llvm = false')
-                        with open(filepath, 'w') as f:
-                            f.write(content)
-                        print(f"已修改: {filepath}")
-        PYSCRIPT
-        
-        python3 /tmp/disable_ci_llvm.py || true
-
     - name: Load N1 custom config
       run: |
         rm -rf openwrt/files openwrt/.config
