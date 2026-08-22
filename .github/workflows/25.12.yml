@@ -29,14 +29,13 @@ jobs:
         docker-images: true
         swap-storage: true
 
-    - name: Initialize environment
-      env:
-        DEBIAN_FRONTEND: noninteractive
+    - name: 初始化编译环境
       run: |
-        curl -s https://build-scripts.immortalwrt.org/init_build_environment.sh | sudo bash > /dev/null
-        sudo timedatectl set-timezone "$TZ"
-        sudo mkdir -p /workdir
-        sudo chown $USER:$GROUPS /workdir
+       curl -s https://build-scripts.immortalwrt.org/init_build_environment.sh | sudo bash > /dev/null
+       sudo timedatectl set-timezone "$TZ"
+       sudo mkdir -p /workdir
+       sudo chown $USER:$GROUPS /workdir
+   
     - name: Clone source code
       working-directory: /workdir
       run: |
@@ -72,15 +71,11 @@ jobs:
     
     - name: Compile N1 firmware
       run: |
-       chmod -R 755 openwrt
-       cd openwrt
-       # 清理构建产物以防止版本冲突
+        chmod -R 755 openwrt
+        cd openwrt
+        echo -e "$(nproc) thread compile"
        
-    
-       echo -e "$(nproc) thread compile"
-       make -j$(( $(nproc) + 1 )) || make -j1 V=s
-       
-       make -j$(( $(nproc) + 1 )) || make -j1 V=s
+        make -j$(( $(nproc) + 1 )) || make -j1 V=s
     - name: Check and fix build artifacts
       run: |
         cd openwrt
@@ -122,7 +117,7 @@ jobs:
     - name: Upload firmware to release
       uses: softprops/action-gh-release@master
       with:
-        tag_name: openwrt_N1_${{ env.FILE_DATE }}
+        tag_name: openwrt_armsr-armv8_${{ env.FILE_DATE }}
         files: ${{ env.PACKAGED_OUTPUTPATH }}/*.{img.xz,img.gz,tar.gz}
         body: |
           首次使用建议全新刷写
