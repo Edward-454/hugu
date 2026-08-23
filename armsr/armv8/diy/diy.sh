@@ -15,6 +15,8 @@ git clone https://github.com/dsddr02/cdnspeedtest package/cdnspeedtest
 git clone https://github.com/dsddr02/peed11 package/luci-app-cloudflarespeedtest
 git clone --depth=1 https://github.com/ophub/luci-app-amlogic package/amlogic
 git clone --depth=1 https://github.com/nikkinikki-org/OpenWrt-momo package/momo
+git clone https://github.com/QiuSimons/luci-app-daed clone/daed
+
 git clone https://github.com/Openwrt-Passwall/openwrt-passwall --depth=1 luci-app-passwall
 git clone https://github.com/Openwrt-Passwall/openwrt-passwall2 --depth=1 package/luci-app-passwall2
 git clone https://github.com/sbwml/luci-app-openlist2 --depth=1 package/luci-app-openlist2
@@ -29,3 +31,4 @@ rm -rf feeds/smpackage/{base-files,dnsmasq,firewall*,fullconenat,libnftnl,nftabl
 rm -rf package/small-package/base-files
 rm -rf package/small-package/luci-app-passwall2
 rm -rf package/small-package/luci-app-passwall
+rm -rf feeds/luci/applications/luci-app-daed feeds/luci/applications/luci-app-passwall
