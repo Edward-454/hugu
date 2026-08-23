@@ -15,7 +15,7 @@ git clone https://github.com/dsddr02/cdnspeedtest package/cdnspeedtest
 git clone https://github.com/dsddr02/peed11 package/luci-app-cloudflarespeedtest
 git clone --depth=1 https://github.com/ophub/luci-app-amlogic package/amlogic
 git clone --depth=1 https://github.com/nikkinikki-org/OpenWrt-momo package/momo
-git clone https://github.com/QiuSimons/luci-app-daed clone/daed
+git clone https://github.com/QiuSimons/luci-app-daed --depth=1 package/daed
 
 git clone https://github.com/Openwrt-Passwall/openwrt-passwall --depth=1 luci-app-passwall
 git clone https://github.com/Openwrt-Passwall/openwrt-passwall2 --depth=1 package/luci-app-passwall2
