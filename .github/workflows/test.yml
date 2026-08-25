@@ -76,7 +76,7 @@ jobs:
       uses: unifreq/openwrt_packit@master
       env:
         # 修正变量名并使用通配符，无需手动创建软链接
-        OPENWRT_ARMSR: openwrt/bin/targets/armsr/armv8/*rootfs.tar.gz
+        OPENWRT_ARMSR: openwrt/bin/targets/armsr/armv8/immortalwrt-armsr-armv8-generic-rootfs.tar.gz
         KERNEL_REPO_URL: tiantuuy/test
         SAVE_OPENWRT_ROOTFS: true
         # 建议根据实际可用内核调整，这里保留用户原设定 6.18.y
