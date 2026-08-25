@@ -1,10 +1,10 @@
-name: Build25
+name: Build2512
 
 on:
   workflow_dispatch:
    
 env:
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  GITHUB_TOKEN: ${{ secrets.N1RE }}
   REPO_URL: https://github.com/immortalwrt/immortalwrt
   REPO_BRANCH: openwrt-25.12
   TZ: Asia/Shanghai
@@ -29,18 +29,13 @@ jobs:
         docker-images: true
         swap-storage: true
 
-    - name: Initialize environment
-      env:
-        DEBIAN_FRONTEND: noninteractive
+    - name: 初始化编译环境
       run: |
-        sudo -E apt-get -qq update > /dev/null
-        sudo -E apt-get -qq install -y $(curl -fsSL https://raw.githubusercontent.com/nantayo/My-Pkg/master/openwrt) > /dev/null
-        sudo -E apt-get -qq autoremove --purge > /dev/null
-        sudo -E apt-get -qq clean > /dev/null
-        sudo timedatectl set-timezone "$TZ"
-        sudo mkdir -p /workdir
-        sudo chown $USER:$GROUPS /workdir
-
+       curl -s https://build-scripts.immortalwrt.org/init_build_environment.sh | sudo bash > /dev/null
+       sudo timedatectl set-timezone "$TZ"
+       sudo mkdir -p /workdir
+       sudo chown $USER:$GROUPS /workdir
+   
     - name: Clone source code
       working-directory: /workdir
       run: |
@@ -61,56 +56,6 @@ jobs:
         rm -rf openwrt/files openwrt/.config
         mv armsr/armv8/N1/files armsr/armv8/N1/.config openwrt/
 
-    - name: Disable all Rust-related packages
-      run: |
-        cd openwrt
-        
-        # 1. 在 .config 中禁用所有已知 Rust 包
-        cat >> .config << 'EOF'
-        # Disable Rust and all Rust-dependent packages
-        CONFIG_PACKAGE_rust=n
-        CONFIG_PACKAGE_rust-bindgen=n
-        CONFIG_PACKAGE_rust-src=n
-        CONFIG_PACKAGE_librust=n
-        CONFIG_PACKAGE_cargo=n
-        CONFIG_PACKAGE_rustc=n
-        CONFIG_PACKAGE_shadowsocks-rust=n
-        CONFIG_PACKAGE_ripgrep=n
-        CONFIG_PACKAGE_fd=n
-        CONFIG_PACKAGE_exa=n
-        CONFIG_PACKAGE_bat=n
-        CONFIG_PACKAGE_alacritty=n
-        CONFIG_PACKAGE_tokei=n
-        CONFIG_PACKAGE_xsv=n
-        EOF
-        
-        # 2. 从 feeds 中移除 Rust 和 shadowsocks-rust 目录（彻底阻止编译）
-        if [ -d "feeds/packages/lang/rust" ]; then
-          mv feeds/packages/lang/rust feeds/packages/lang/rust.disabled
-          echo "Rust feed disabled"
-        fi
-        if [ -d "feeds/packages/net/shadowsocks-rust" ]; then
-          mv feeds/packages/net/shadowsocks-rust feeds/packages/net/shadowsocks-rust.disabled
-          echo "shadowsocks-rust feed disabled"
-        fi
-        
-        # 3. 清理其他 Makefile 中对这些包的依赖（防止被拉入）
-        find feeds -name "Makefile" -exec sed -i '/DEPENDS.*shadowsocks-rust/d' {} \;
-        find feeds -name "Makefile" -exec sed -i '/PKG_BUILD_DEPENDS.*rust/d' {} \;
-        find feeds -name "Makefile" -exec sed -i '/DEPENDS.*rust/d' {} \;
-        
-        echo "All Rust-related packages have been disabled."
-
-    - name: Configure environment (disable Rust LLVM download fallback)
-      run: |
-        echo "LLVM_SKIP_DOWNLOAD=1" >> $GITHUB_ENV
-        echo "RUSTUP_INIT_SKIP_PATH_CHECK=yes" >> $GITHUB_ENV
-        mkdir -p ~/.cargo
-        cat > ~/.cargo/config.toml << 'EOF'
-        [llvm]
-        download-ci-llvm = false
-        EOF
-
     - name: Download package
       working-directory: ./openwrt
       run: |
@@ -119,43 +64,22 @@ jobs:
         find dl -size -1k -exec rm -f {} \;
 
     - name: Compile N1 firmware
-      working-directory: ./openwrt
-      env:
-        LLVM_SKIP_DOWNLOAD: 1
-        RUSTUP_INIT_SKIP_PATH_CHECK: yes
-        RUST_BACKTRACE: 1
       run: |
-        chmod -R 755 .
-        echo -e "$(nproc) thread compile"
-        make -j$(( $(nproc) + 1 )) V=s || make -j1 V=s
-
-    - name: Check and fix build artifacts
-      run: |
+        chmod -R 755 openwrt
         cd openwrt
-        echo "=== 查找编译产物 ==="
-        find bin/targets -name "*.tar.gz" -type f
-        find bin/targets -name "*.img" -type f
-        echo "=== 检查 armsr/armv8 目录 ==="
-        ls -la bin/targets/armsr/armv8/ || echo "目录不存在"
-        if ls bin/targets/armsr/armv8/*-rootfs.tar.gz 1> /dev/null 2>&1; then
-          ROOTFS_FILE=$(ls bin/targets/armsr/armv8/*-rootfs.tar.gz | head -1)
-          echo "找到 rootfs: $ROOTFS_FILE"
-          ln -sf "$(basename "$ROOTFS_FILE")" bin/targets/armsr/armv8/openwrt-armsr-armv8-generic-rootfs.tar.gz
-        elif ls bin/targets/armsr/armv8/*.tar.gz 1> /dev/null 2>&1; then
-          TAR_FILE=$(ls bin/targets/armsr/armv8/*.tar.gz | head -1)
-          echo "找到 tar.gz: $TAR_FILE"
-          ln -sf "$(basename "$TAR_FILE")" bin/targets/armsr/armv8/openwrt-armsr-armv8-generic-rootfs.tar.gz
-        else
-          echo "错误：未找到任何 rootfs 文件！"
-          exit 1
-        fi
-        
+        echo -e "$(nproc) thread compile"
+        make -j$(( $(nproc) + 1 )) || make -j1 V=s
+
+    # 删除了原“Check and fix build artifacts”步骤，因为打包Action可直接使用通配符
+
     - name: Package N1 firmware
       uses: unifreq/openwrt_packit@master
       env:
-        OPENWRT_ARMVIRT: openwrt/bin/targets/armsr/armv8/openwrt-armsr-armv8-generic-rootfs.tar.gz
+        # 修正变量名并使用通配符，无需手动创建软链接
+        OPENWRT_ARMSR: openwrt/bin/targets/armsr/armv8/*rootfs.tar.gz
         KERNEL_REPO_URL: tiantuuy/test
         SAVE_OPENWRT_ROOTFS: true
+        # 建议根据实际可用内核调整，这里保留用户原设定 6.18.y
         KERNEL_VERSION_NAME: 6.18.y
         PACKAGE_SOC: s905d
         GZIP_IMGS: .gz
@@ -163,13 +87,18 @@ jobs:
         SW_FLOWOFFLOAD: 0
         SFE_FLOW: 0
         ENABLE_WIFI_K510: 0
-        OPENWRT_IP: 192.168.110.249
+        OPENWRT_IP: 192.168.110.249/24
 
     - name: Upload firmware to release
-      uses: softprops/action-gh-release@master
+      # 使用推荐的 upload-to-releases，简化上传和版本管理
+      uses: ophub/upload-to-releases@main
       with:
-        tag_name: openwrt_N1_${{ env.FILE_DATE }}
-        files: ${{ env.PACKAGED_OUTPUTPATH }}/*.{img.xz,img.gz,tar.gz}
+        tag: openwrt_armsr-armv8_${{ env.FILE_DATE }}
+        artifacts: ${{ env.PACKAGED_OUTPUTPATH }}/*
+        allow_updates: true
+        replaces_artifacts: true
+        make_latest: true
+        gh_token: ${{ secrets.N1RE }}
         body: |
           首次使用建议全新刷写
           * 基本信息
@@ -183,7 +112,7 @@ jobs:
       with:
         keep_latest: 2
         delete_tags: true
-        
+
     - name: Delete old workflow runs
       uses: Mattraks/delete-workflow-runs@v2.1.0
       with:
