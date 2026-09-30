@@ -1,6 +1,4 @@
 #!/bin/bash
-patch -p1 -f < $(dirname "$0")/luci.patch
-# 确保base-files版本正确设置
 #sed -i 's/base-files=/base-files=1~3dacd2f/g' $(find . -name "*.mk" -o -name "Makefile")
 # sed -i 's/192.168.1.1/192.168.110.249/g' package/base-files/files/bin/config_generate
 sed -i 's/ImmortalWrt/redmek40/g' package/base-files/files/bin/config_generate
@@ -16,7 +14,7 @@ rm -rf feeds/packages/net/cdnspeedtest
 git clone --depth=1 https://github.com/ophub/luci-app-amlogic package/amlogic
 git clone --depth=1 https://github.com/nikkinikki-org/OpenWrt-momo package/momo
 #git clone --depth=1 https://github.com/nikkinikki-org/OpenWrt-nikki package/niki
-git clone --depth=1 https://github.com/vernesong/OpenClash package/openclash
+#git clone --depth=1 https://github.com/vernesong/OpenClash package/openclash
 #git clone https://github.com/Openwrt-Passwall/openwrt-passwall --depth=1 luci-app-passwall
 #git clone https://github.com/Openwrt-Passwall/openwrt-passwall2 --depth=1 package/luci-app-passwall2
 git clone https://github.com/sbwml/luci-app-openlist2 --depth=1 package/luci-app-openlist2
@@ -27,9 +25,9 @@ git clone https://github.com/Openwrt-Passwall/openwrt-passwall-packages --depth=
 # git clone https://github.com/kenzok8/small-package --depth=1 package/small-package
 # sed -i '$a src-git smpackage https://github.com/kenzok8/small-package' feeds.conf.default
 # sed -i '$a src-git smpackage https://github.com/kenzok8/small-package' feeds.conf.default
-rm -rf feeds/smpackage/{base-files,dnsmasq,firewall*,fullconenat,libnftnl,nftables,ppp,opkg,ucl,upx,vsftpd*,miniupnpd-iptables,wireless-regdb}
-rm -rf package/small-package/base-files
-rm -rf package/small-package/luci-app-passwall2
-rm -rf package/small-package/luci-app-passwall
-rm -rf feeds/packages/lang/golang
+#rm -rf feeds/smpackage/{base-files,dnsmasq,firewall*,fullconenat,libnftnl,nftables,ppp,opkg,ucl,upx,vsftpd*,miniupnpd-iptables,wireless-regdb}
+#rm -rf package/small-package/base-files
+#rm -rf package/small-package/luci-app-passwall2
+#rm -rf package/small-package/luci-app-passwall
+#rm -rf feeds/packages/lang/golang
 git clone https://github.com/sbwml/packages_lang_golang -b 26.x feeds/packages/lang/golang
