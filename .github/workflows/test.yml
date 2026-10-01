@@ -11,7 +11,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
     - name: Checkout
@@ -21,7 +21,7 @@ jobs:
       uses: jlumbroso/free-disk-space@main
       with:
         tool-cache: false
-        mandb: true
+        #mandb: true
         android: true
         dotnet: true
         haskell: true
@@ -84,9 +84,9 @@ jobs:
         PACKAGE_SOC: s905d
         GZIP_IMGS: .gz
         WHOAMI: test
-        SW_FLOWOFFLOAD: 0
-        SFE_FLOW: 0
-        ENABLE_WIFI_K510: 0
+        #SW_FLOWOFFLOAD: 0
+        #SFE_FLOW: 0
+        #ENABLE_WIFI_K510: 0
         OPENWRT_IP: 192.168.110.249/24
 
     - name: Upload firmware to release
@@ -107,16 +107,12 @@ jobs:
           账户: root
           密码: password
 
-    - name: Delete old releases
-      uses: dev-drprasad/delete-older-releases@master
+    - name: Delete old
+      uses: ophub/delete-releases-workflows@main
       with:
-        keep_latest: 2
+        delete_releases: true
+        releases_keep_latest: 2
         delete_tags: true
-
-    - name: Delete old workflow runs
-      uses: Mattraks/delete-workflow-runs@v2.1.0
-      with:
-        token: ${{ github.token }}
-        repository: ${{ github.repository }}
-        retain_days: 1
-        keep_minimum_runs: 0
+        delete_workflows: true
+        workflows_keep_day: 0
+        gh_token: ${{ secrets.N1RE }}
