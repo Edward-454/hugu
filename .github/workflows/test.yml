@@ -84,9 +84,9 @@ jobs:
         PACKAGE_SOC: s905d
         GZIP_IMGS: .gz
         WHOAMI: test
-        #SW_FLOWOFFLOAD: 0
-        #SFE_FLOW: 0
-        #ENABLE_WIFI_K510: 0
+        SW_FLOWOFFLOAD: 0
+        SFE_FLOW: 0
+        ENABLE_WIFI_K510: 0
         OPENWRT_IP: 192.168.110.249/24
 
     - name: Upload firmware to release
@@ -100,8 +100,7 @@ jobs:
         make_latest: true
         gh_token: ${{ secrets.N1RE }}
         body: |
-          首次使用建议全新刷写
-          * 基本信息
+          个人使用，无法他用！！
           openwrt-25.12分支
           IP: 192.168.110.249
           账户: root
