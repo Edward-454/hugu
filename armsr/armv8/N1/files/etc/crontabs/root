@@ -1,1 +1,2 @@
 0 4 * * * fstrim -a
+25 11 * * * cd /root/sgcc_electricity_new && /usr/bin/docker compose run --rm sgcc_electricity_app >> /root/huj.log 2>&1
