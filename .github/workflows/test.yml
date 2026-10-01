@@ -11,7 +11,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-24.04
 
     steps:
     - name: Checkout
@@ -84,9 +84,9 @@ jobs:
         PACKAGE_SOC: s905d
         GZIP_IMGS: .gz
         WHOAMI: test
-        SW_FLOWOFFLOAD: 0
-        SFE_FLOW: 0
-        ENABLE_WIFI_K510: 0
+        #SW_FLOWOFFLOAD: 0
+        #SFE_FLOW: 0
+        #ENABLE_WIFI_K510: 0
         OPENWRT_IP: 192.168.110.249/24
 
     - name: Upload firmware to release
